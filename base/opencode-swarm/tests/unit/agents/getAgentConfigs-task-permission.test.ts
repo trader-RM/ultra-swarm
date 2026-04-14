@@ -123,6 +123,36 @@ describe('getAgentConfigs - Architect Task Permission Hotfix', () => {
 			expect(testEngineerConfig.mode).toBe('subagent');
 			expect(testEngineerConfig.permission).toBeUndefined();
 		});
+
+		// Adversarial: ECC agents that are NOT coder must NOT get task:allow
+		// This verifies that the baseAgentName check prevents false positives
+		// (e.g., build_error_resolver, cpp_reviewer, etc. must NOT get task permission)
+		test('ECC build_error_resolver gets mode:subagent without task permission', () => {
+			const configs = getAgentConfigs();
+			const buildResolver = configs['build_error_resolver'];
+
+			expect(buildResolver).toBeDefined();
+			expect(buildResolver.mode).toBe('subagent');
+			expect(buildResolver.permission).toBeUndefined();
+		});
+
+		test('ECC cpp_reviewer gets mode:subagent without task permission', () => {
+			const configs = getAgentConfigs();
+			const cppReviewer = configs['cpp_reviewer'];
+
+			expect(cppReviewer).toBeDefined();
+			expect(cppReviewer.mode).toBe('subagent');
+			expect(cppReviewer.permission).toBeUndefined();
+		});
+
+		test('ECC gan_generator gets mode:subagent without task permission', () => {
+			const configs = getAgentConfigs();
+			const ganGenerator = configs['gan_generator'];
+
+			expect(ganGenerator).toBeDefined();
+			expect(ganGenerator.mode).toBe('subagent');
+			expect(ganGenerator.permission).toBeUndefined();
+		});
 	});
 
 	describe('multiple swarm scenarios', () => {

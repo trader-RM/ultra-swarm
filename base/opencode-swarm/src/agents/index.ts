@@ -711,16 +711,19 @@ export function getAgentConfigs(
 				description: agent.description,
 			};
 
+			// Extract base agent name using canonical prefix stripper (supports underscore, hyphen, space)
+			const baseAgentName = stripKnownSwarmPrefix(agent.name);
+
 			// Apply mode based on agent type
-			// Architects are primary, everything else is subagent
-			if (agent.name === 'architect' || agent.name.endsWith('_architect')) {
+			// Architects are primary, everything else is subagent (uses canonical base name)
+			if (baseAgentName === 'architect') {
 				sdkConfig.mode = 'primary';
 				// Allow task delegation for architect agents
 				(sdkConfig.permission as Record<string, 'allow'>) = { task: 'allow' };
 			} else {
 				sdkConfig.mode = 'subagent';
 				// Allow task delegation for coder agents — ECC build resolvers and gan_generator
-				if (agent.name === 'coder' || agent.name.endsWith('_coder')) {
+				if (baseAgentName === 'coder') {
 					(sdkConfig.permission as Record<string, 'allow'>) = { task: 'allow' };
 				}
 			}
@@ -729,9 +732,6 @@ export function getAgentConfigs(
 			if (sdkConfig.mode === 'primary') {
 				delete sdkConfig.model;
 			}
-
-			// Extract base agent name using canonical prefix stripper (supports underscore, hyphen, space)
-			const baseAgentName = stripKnownSwarmPrefix(agent.name);
 
 			// If tool filtering is globally disabled, use original tools unchanged
 			if (!toolFilterEnabled) {
