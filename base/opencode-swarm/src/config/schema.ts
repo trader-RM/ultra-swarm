@@ -58,6 +58,9 @@ export function stripKnownSwarmPrefix(agentName: string): string {
 	}
 
 	// Check if stripped result is a known agent name
+	// ECC specialist agents (37 added in v6.68.0+) are resolvable here via their
+	// membership in ALL_AGENT_NAMES (derived from ALL_SUBAGENT_NAMES in constants.ts).
+	// Example: stripKnownSwarmPrefix('local_gan_evaluator') → 'gan_evaluator' ✓
 	if ((ALL_AGENT_NAMES as readonly string[]).includes(stripped)) {
 		return stripped;
 	}
