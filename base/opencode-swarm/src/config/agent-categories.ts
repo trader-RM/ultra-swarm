@@ -18,11 +18,14 @@ export const AGENT_CATEGORY: Readonly<Record<string, AgentCategory>> = {
 	critic: 'qa',
 	critic_sounding_board: 'qa',
 	critic_drift_verifier: 'qa',
+	critic_oversight: 'qa',
 
 	// Support agents (advise, document, design)
 	sme: 'support',
 	docs: 'support',
 	designer: 'support',
+	curator_init: 'support',
+	curator_phase: 'support',
 
 	// ECC Review/QA agents (specialized reviewers and evaluators)
 	code_reviewer: 'qa',
