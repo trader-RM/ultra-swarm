@@ -719,6 +719,10 @@ export function getAgentConfigs(
 				(sdkConfig.permission as Record<string, 'allow'>) = { task: 'allow' };
 			} else {
 				sdkConfig.mode = 'subagent';
+				// Allow task delegation for coder agents — ECC build resolvers and gan_generator
+				if (agent.name === 'coder' || agent.name.endsWith('_coder')) {
+					(sdkConfig.permission as Record<string, 'allow'>) = { task: 'allow' };
+				}
 			}
 
 			// Remove model for primary agents (model selection handled by orchestrator)
@@ -843,7 +847,7 @@ export function getAgentConfigs(
 
 // Re-export agent types
 export { createArchitectAgent } from './architect';
-export { createCoderAgent } from './coder';
+export { CODER_PROMPT, createCoderAgent } from './coder';
 export { createCriticAgent } from './critic';
 export { createCuratorAgent } from './curator-agent';
 export { createDesignerAgent } from './designer';

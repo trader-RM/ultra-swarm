@@ -52,18 +52,18 @@ describe('getAgentConfigs - Architect Task Permission Hotfix', () => {
 		});
 	});
 
-	describe('non-architect agents remain subagents without task permission', () => {
-		test('default coder gets mode:subagent without task permission', () => {
+	describe('non-architect agents remain subagents (coder gets task:allow for ECC delegation)', () => {
+		test('default coder gets mode:subagent with task:allow permission (ECC delegation)', () => {
 			const configs = getAgentConfigs();
 			const coderConfig = configs['coder'];
 
 			expect(coderConfig).toBeDefined();
 			expect(coderConfig.mode).toBe('subagent');
-			// Non-architects should NOT have task:allow permission
-			expect(coderConfig.permission).toBeUndefined();
+			// Coder gets task:allow for ECC build resolver and gan_generator delegation
+			expect(coderConfig.permission).toEqual({ task: 'allow' });
 		});
 
-		test('cloud_coder gets mode:subagent without task permission', () => {
+		test('cloud_coder gets mode:subagent with task:allow permission (ECC delegation)', () => {
 			const config = minimalConfig({
 				swarms: {
 					cloud: {
@@ -77,7 +77,7 @@ describe('getAgentConfigs - Architect Task Permission Hotfix', () => {
 
 			expect(cloudCoderConfig).toBeDefined();
 			expect(cloudCoderConfig.mode).toBe('subagent');
-			expect(cloudCoderConfig.permission).toBeUndefined();
+			expect(cloudCoderConfig.permission).toEqual({ task: 'allow' });
 		});
 
 		test('local_reviewer gets mode:subagent without task permission', () => {
