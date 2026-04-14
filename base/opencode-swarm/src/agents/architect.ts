@@ -43,12 +43,12 @@ export interface AgentDefinition {
  * - Context is preserved across agent delegations
  */
 
-const ARCHITECT_PROMPT = `You are Architect - orchestrator of a multi-agent swarm.
+export const ARCHITECT_PROMPT = `You are Architect - orchestrator of a multi-agent swarm.
 
 ## IDENTITY
 
 Swarm: {{SWARM_ID}}
-Your agents: {{AGENT_PREFIX}}explorer, {{AGENT_PREFIX}}sme, {{AGENT_PREFIX}}coder, {{AGENT_PREFIX}}reviewer, {{AGENT_PREFIX}}test_engineer, {{AGENT_PREFIX}}critic, {{AGENT_PREFIX}}critic_sounding_board, {{AGENT_PREFIX}}critic_drift_verifier, {{AGENT_PREFIX}}critic_oversight, {{AGENT_PREFIX}}docs, {{AGENT_PREFIX}}designer, {{AGENT_PREFIX}}curator_init, {{AGENT_PREFIX}}curator_phase, {{AGENT_PREFIX}}code_reviewer, {{AGENT_PREFIX}}security_reviewer, {{AGENT_PREFIX}}cpp_reviewer, {{AGENT_PREFIX}}go_reviewer, {{AGENT_PREFIX}}kotlin_reviewer, {{AGENT_PREFIX}}java_reviewer, {{AGENT_PREFIX}}rust_reviewer, {{AGENT_PREFIX}}python_reviewer, {{AGENT_PREFIX}}typescript_reviewer, {{AGENT_PREFIX}}csharp_reviewer, {{AGENT_PREFIX}}flutter_reviewer, {{AGENT_PREFIX}}database_reviewer, {{AGENT_PREFIX}}healthcare_reviewer, {{AGENT_PREFIX}}gan_evaluator, {{AGENT_PREFIX}}opensource_sanitizer, {{AGENT_PREFIX}}build_error_resolver, {{AGENT_PREFIX}}cpp_build_resolver, {{AGENT_PREFIX}}go_build_resolver, {{AGENT_PREFIX}}kotlin_build_resolver, {{AGENT_PREFIX}}java_build_resolver, {{AGENT_PREFIX}}rust_build_resolver, {{AGENT_PREFIX}}pytorch_build_resolver, {{AGENT_PREFIX}}dart_build_resolver, {{AGENT_PREFIX}}tdd_guide, {{AGENT_PREFIX}}e2e_runner, {{AGENT_PREFIX}}refactor_cleaner, {{AGENT_PREFIX}}performance_optimizer, {{AGENT_PREFIX}}gan_generator, {{AGENT_PREFIX}}opensource_forker, {{AGENT_PREFIX}}opensource_packager, {{AGENT_PREFIX}}planner, {{AGENT_PREFIX}}doc_updater, {{AGENT_PREFIX}}docs_lookup, {{AGENT_PREFIX}}harness_optimizer, {{AGENT_PREFIX}}loop_operator, {{AGENT_PREFIX}}chief_of_staff, {{AGENT_PREFIX}}gan_planner
+Your agents: {{AGENT_PREFIX}}explorer, {{AGENT_PREFIX}}sme, {{AGENT_PREFIX}}coder, {{AGENT_PREFIX}}reviewer, {{AGENT_PREFIX}}test_engineer, {{AGENT_PREFIX}}critic, {{AGENT_PREFIX}}critic_sounding_board, {{AGENT_PREFIX}}critic_drift_verifier, {{AGENT_PREFIX}}critic_oversight, {{AGENT_PREFIX}}docs, {{AGENT_PREFIX}}designer, {{AGENT_PREFIX}}curator_init, {{AGENT_PREFIX}}curator_phase, {{AGENT_PREFIX}}harness_optimizer, {{AGENT_PREFIX}}loop_operator
 
 ## PROJECT CONTEXT
 Session-start priming block. Use any known values immediately; if a field is still unresolved, run MODE: DISCOVER before relying on it.
@@ -365,6 +365,8 @@ SECURITY_KEYWORDS: password, secret, token, credential, auth, login, encryption,
 {{AGENT_PREFIX}}critic_sounding_board - Pre-escalation pushback (honest engineer review before user contact)
 {{AGENT_PREFIX}}docs - Documentation updates (README, API docs, guides — NOT .swarm/ files)
 {{AGENT_PREFIX}}designer - UI/UX design specs (scaffold generation for UI components — runs BEFORE coder on UI tasks)
+{{AGENT_PREFIX}}harness_optimizer - Analyzes and improves the local agent harness configuration for reliability, cost, and throughput
+{{AGENT_PREFIX}}loop_operator - Operates autonomous agent loops, monitors progress, and intervenes when loops stall
 
 ## SLASH COMMANDS
 {{SLASH_COMMANDS}}
