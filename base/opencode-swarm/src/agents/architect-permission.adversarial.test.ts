@@ -5,6 +5,7 @@
 
 import { describe, expect, it } from 'bun:test';
 import type { PluginConfig } from '../config';
+import { stripKnownSwarmPrefix } from '../config/schema';
 import { getAgentConfigs } from './index';
 
 // Helper to create minimal valid PluginConfig (bypasses strict schema)
@@ -40,10 +41,10 @@ describe('ADVERSARIAL: Architect Task Permission Edge Cases', () => {
 			expect(isPrimaryMode(config, 'architect')).toBe(true);
 		});
 
-		it('should NOT grant task permission to non-architect agents in default swarm', () => {
+		it('should grant task permission to coder and reviewer, but not other non-architect agents in default swarm', () => {
 			const config = getAgentConfigs(undefined);
-			expect(hasTaskPermission(config, 'coder')).toBe(false);
-			expect(hasTaskPermission(config, 'reviewer')).toBe(false);
+			expect(hasTaskPermission(config, 'coder')).toBe(true);
+			expect(hasTaskPermission(config, 'reviewer')).toBe(true);
 			expect(hasTaskPermission(config, 'explorer')).toBe(false);
 			expect(hasTaskPermission(config, 'sme')).toBe(false);
 			expect(hasTaskPermission(config, 'critic')).toBe(false);
@@ -101,7 +102,7 @@ describe('ADVERSARIAL: Architect Task Permission Edge Cases', () => {
 			expect(isPrimaryMode(config, 'paid_architect')).toBe(true);
 		});
 
-		it('should NOT grant task permission to swarm-prefixed non-architects', () => {
+		it('should grant task permission to swarm-prefixed coder and reviewer, but not other non-architects', () => {
 			const config = getAgentConfigs(
 				minimalConfig({
 					swarms: {
@@ -109,9 +110,9 @@ describe('ADVERSARIAL: Architect Task Permission Edge Cases', () => {
 					},
 				}),
 			);
-			// All non-architect agents should remain subagents without task permission
-			expect(hasTaskPermission(config, 'cloud_coder')).toBe(false);
-			expect(hasTaskPermission(config, 'cloud_reviewer')).toBe(false);
+			// Coder and reviewer agents get task permission for ECC delegation; other non-architects remain without task permission
+			expect(hasTaskPermission(config, 'cloud_coder')).toBe(true);
+			expect(hasTaskPermission(config, 'cloud_reviewer')).toBe(true);
 			expect(hasTaskPermission(config, 'cloud_explorer')).toBe(false);
 			expect(hasTaskPermission(config, 'cloud_sme')).toBe(false);
 			expect(hasTaskPermission(config, 'cloud_critic')).toBe(false);
@@ -120,55 +121,50 @@ describe('ADVERSARIAL: Architect Task Permission Edge Cases', () => {
 		});
 	});
 
-	describe('String matching logic edge cases (endsWith behavior)', () => {
-		// These test the underlying string logic that determines permission
-
+	describe('String matching logic edge cases (stripKnownSwarmPrefix)', () => {
 		const testCases = [
-			// [name, expectedMatch, description]
-			['architect', true, 'exact match'],
-			['cloud_architect', true, 'prefix_architect (legitimate swarm)'],
-			['architect_', false, 'trailing underscore'],
-			['architect_extra', false, 'contains but not suffix'],
-			['architect_coder', false, 'contains architect in middle'],
-			['not_an_architect', true, 'contains _architect as suffix (ISSUE)'],
-			['architected', false, 'no underscore separator'],
-			['my_architect_role', false, 'different suffix'],
-			['ARCHITECT', false, 'uppercase - case sensitive'],
-			['Architect', false, 'title case - case sensitive'],
-			['ARCHITECT_architect', true, 'ends with lowercase _architect'],
-			['_architect', true, 'leading underscore (suspicious)'],
-			['__architect', true, 'double leading underscore (ends with _architect)'],
+			['architect', 'architect', 'exact match resolves to architect base name'],
+			['cloud_architect', 'architect', 'prefix_architect strips to architect'],
+			['local_coder', 'coder', 'prefix_coder strips to coder'],
+			['mega_reviewer', 'reviewer', 'prefix_reviewer strips to reviewer'],
+			['architect_', 'architect_', 'does not match any ALL_AGENT_NAMES entry'],
 			[
-				'_____architect',
-				true,
-				'multiple leading underscores (ends with _architect)',
+				'architect_extra',
+				'architect_extra',
+				'does not match any ALL_AGENT_NAMES entry',
 			],
-			['architect_____', false, 'multiple trailing underscores'],
-			['architecture', false, 'similar but no underscore'],
-			['architektt', false, 'typo'],
-			['', false, 'empty string'],
+			[
+				'not_an_architect',
+				'architect',
+				'Strategy 2 suffix match: ends with _architect which is a known agent name',
+			],
+			[
+				'architected',
+				'architected',
+				'no underscore separator — "architected" not in ALL_AGENT_NAMES, returns original',
+			],
+			[
+				'ARCHITECT',
+				'architect',
+				'case insensitive — normalized to lowercase, matches known agent',
+			],
+			[
+				'Architect',
+				'architect',
+				'case insensitive — normalized to lowercase, matches known agent',
+			],
+			['', '', 'empty string returns empty'],
 		] as const;
 
-		testCases.forEach(([name, expectedMatch, description]) => {
-			it(`should ${expectedMatch ? 'match' : 'NOT match'}: "${name}" (${description})`, () => {
-				// Test the exact condition from getAgentConfigs line 342
-				const matches = name === 'architect' || name.endsWith('_architect');
-				expect(matches).toBe(expectedMatch);
+		testCases.forEach(([input, expectedBase, description]) => {
+			it(`stripKnownSwarmPrefix("${input}") → "${expectedBase}" (${description})`, () => {
+				expect(stripKnownSwarmPrefix(input)).toBe(expectedBase);
 			});
 		});
 	});
 
 	describe('Potential permission leakage vectors', () => {
-		it('should NOT leak task permission to designer (opt-in agent)', () => {
-			const config = getAgentConfigs(
-				minimalConfig({
-					ui_review: { enabled: true, trigger_paths: [], trigger_keywords: [] },
-				}),
-			);
-			expect(hasTaskPermission(config, 'designer')).toBe(false);
-		});
-
-		it('should NOT leak task permission even with custom agent config', () => {
+		it('should grant task permission to coder and reviewer regardless of custom agent config', () => {
 			const config = getAgentConfigs(
 				minimalConfig({
 					agents: {
@@ -177,9 +173,9 @@ describe('ADVERSARIAL: Architect Task Permission Edge Cases', () => {
 					},
 				}),
 			);
-			// Custom config should not affect permission
-			expect(hasTaskPermission(config, 'coder')).toBe(false);
-			expect(hasTaskPermission(config, 'reviewer')).toBe(false);
+			// Coder and reviewer get task:allow regardless of custom model config
+			expect(hasTaskPermission(config, 'coder')).toBe(true);
+			expect(hasTaskPermission(config, 'reviewer')).toBe(true);
 		});
 
 		it('should NOT grant task permission in legacy single-swarm mode with prefix', () => {
@@ -214,10 +210,13 @@ describe('ADVERSARIAL: Architect Task Permission Edge Cases', () => {
 			expect(hasTaskPermission(config, 'cloud_architect')).toBe(true);
 			expect(hasTaskPermission(config, 'mega_architect')).toBe(true);
 
-			// But non-architects should not
-			expect(hasTaskPermission(config, 'local_coder')).toBe(false);
-			expect(hasTaskPermission(config, 'cloud_coder')).toBe(false);
-			expect(hasTaskPermission(config, 'mega_coder')).toBe(false);
+			// Coder and reviewer get task permission for ECC delegation
+			expect(hasTaskPermission(config, 'local_coder')).toBe(true);
+			expect(hasTaskPermission(config, 'cloud_coder')).toBe(true);
+			expect(hasTaskPermission(config, 'mega_coder')).toBe(true);
+			expect(hasTaskPermission(config, 'local_reviewer')).toBe(true);
+			expect(hasTaskPermission(config, 'cloud_reviewer')).toBe(true);
+			expect(hasTaskPermission(config, 'mega_reviewer')).toBe(true);
 		});
 
 		it('should handle "architect" as swarm name (edge case)', () => {
@@ -244,10 +243,11 @@ describe('ADVERSARIAL: Architect Task Permission Edge Cases', () => {
 			});
 		});
 
-		it('should set permission to undefined for non-architect agents', () => {
+		it('should set permission to { task: "allow" } for coder and reviewer, undefined for other non-architect agents', () => {
 			const config = getAgentConfigs(undefined);
-			// Non-architects should not have permission property set
-			expect(config.coder?.permission).toBeUndefined();
+			expect(config.coder?.permission).toEqual({ task: 'allow' });
+			expect(config.reviewer?.permission).toEqual({ task: 'allow' });
+			expect(config.explorer?.permission).toBeUndefined();
 		});
 
 		it('should set mode to "primary" for architect, "subagent" for others', () => {

@@ -722,8 +722,12 @@ export function getAgentConfigs(
 				(sdkConfig.permission as Record<string, 'allow'>) = { task: 'allow' };
 			} else {
 				sdkConfig.mode = 'subagent';
-				// Allow task delegation for coder agents — ECC build resolvers and gan_generator
+				// Allow task delegation for agents that delegate to ECC specialists
 				if (baseAgentName === 'coder') {
+					// Coder delegates to ECC build resolvers and gan_generator
+					(sdkConfig.permission as Record<string, 'allow'>) = { task: 'allow' };
+				} else if (baseAgentName === 'reviewer') {
+					// Reviewer delegates to ECC review specialists
 					(sdkConfig.permission as Record<string, 'allow'>) = { task: 'allow' };
 				}
 			}
@@ -855,6 +859,7 @@ export { createDocsAgent } from './docs';
 export { createExplorerAgent } from './explorer';
 export {
 	createReviewerAgent,
+	REVIEWER_PROMPT,
 	SECURITY_CATEGORIES,
 	type SecurityCategory,
 } from './reviewer';

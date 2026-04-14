@@ -52,7 +52,7 @@ describe('getAgentConfigs - Architect Task Permission Hotfix', () => {
 		});
 	});
 
-	describe('non-architect agents remain subagents (coder gets task:allow for ECC delegation)', () => {
+	describe('non-architect agents remain subagents (coder and reviewer get task:allow for ECC delegation)', () => {
 		test('default coder gets mode:subagent with task:allow permission (ECC delegation)', () => {
 			const configs = getAgentConfigs();
 			const coderConfig = configs['coder'];
@@ -80,7 +80,17 @@ describe('getAgentConfigs - Architect Task Permission Hotfix', () => {
 			expect(cloudCoderConfig.permission).toEqual({ task: 'allow' });
 		});
 
-		test('local_reviewer gets mode:subagent without task permission', () => {
+		test('default reviewer gets mode:subagent with task:allow permission (ECC delegation)', () => {
+			const configs = getAgentConfigs();
+			const reviewerConfig = configs['reviewer'];
+
+			expect(reviewerConfig).toBeDefined();
+			expect(reviewerConfig.mode).toBe('subagent');
+			// Reviewer gets task:allow for ECC review specialist delegation
+			expect(reviewerConfig.permission).toEqual({ task: 'allow' });
+		});
+
+		test('local_reviewer gets mode:subagent with task:allow permission (ECC delegation)', () => {
 			const config = minimalConfig({
 				swarms: {
 					local: {
@@ -94,7 +104,7 @@ describe('getAgentConfigs - Architect Task Permission Hotfix', () => {
 
 			expect(localReviewerConfig).toBeDefined();
 			expect(localReviewerConfig.mode).toBe('subagent');
-			expect(localReviewerConfig.permission).toBeUndefined();
+			expect(localReviewerConfig.permission).toEqual({ task: 'allow' });
 		});
 
 		test('explorer gets mode:subagent without task permission', () => {
