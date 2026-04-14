@@ -729,6 +729,9 @@ export function getAgentConfigs(
 				} else if (baseAgentName === 'reviewer') {
 					// Reviewer delegates to ECC review specialists
 					(sdkConfig.permission as Record<string, 'allow'>) = { task: 'allow' };
+				} else if (baseAgentName === 'explorer') {
+					// Explorer delegates to ECC research specialists
+					(sdkConfig.permission as Record<string, 'allow'>) = { task: 'allow' };
 				}
 			}
 
@@ -856,7 +859,7 @@ export { createCriticAgent } from './critic';
 export { createCuratorAgent } from './curator-agent';
 export { createDesignerAgent } from './designer';
 export { createDocsAgent } from './docs';
-export { createExplorerAgent } from './explorer';
+export { EXPLORER_PROMPT, createExplorerAgent } from './explorer';
 export {
 	createReviewerAgent,
 	REVIEWER_PROMPT,

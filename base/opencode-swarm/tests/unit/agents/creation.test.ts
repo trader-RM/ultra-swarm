@@ -466,24 +466,48 @@ describe('Agent Creation Functions', () => {
 					expect(prompt).toContain('## IDENTITY');
 				});
 
-				test('contains anti-delegation directive', () => {
-					expect(prompt).toContain(
-						'DO NOT use the Task tool to delegate to other agents',
-					);
+				// Each agent has its own identity hardening text
+				test('contains agent-specific delegation guidance', () => {
+					if (name === 'coder') {
+						expect(prompt).toContain('coordinate specialist ECC agents');
+					} else if (name === 'sme') {
+						expect(prompt).toContain('DO NOT use the Task tool to delegate');
+					} else if (name === 'explorer') {
+						expect(prompt).toContain('coordinate specialist ECC research agents');
+						expect(prompt).toContain(
+							'You remain the owner of the discovery and investigation lane',
+						);
+					} else if (name === 'reviewer') {
+						expect(prompt).toContain('coordinate specialist ECC review agents');
+						expect(prompt).toContain(
+							'You remain the owner of the review lane',
+						);
+					} else if (name === 'critic') {
+						expect(prompt).toContain('DO NOT use the Task tool to delegate');
+					} else if (name === 'test_engineer') {
+						expect(prompt).toContain('DO NOT use the Task tool to delegate');
+					}
 				});
 
-				test('contains identity reinforcement', () => {
-					expect(prompt).toContain('You ARE the agent that does the work');
-				});
-
-				test('contains agent reference explanation', () => {
-					expect(prompt).toContain('IGNORE them');
-					expect(prompt).toContain('context from the orchestrator');
+				test('contains delegation rules', () => {
+					// Only coder, reviewer, and explorer have delegation rules
+					if (name === 'coder' || name === 'reviewer' || name === 'explorer') {
+						expect(prompt).toContain('DELEGATION RULES:');
+					} else {
+						expect(prompt).not.toContain('DELEGATION RULES:');
+					}
 				});
 
 				test('contains WRONG/RIGHT examples', () => {
-					expect(prompt).toContain('WRONG:');
-					expect(prompt).toContain('RIGHT:');
+					// coder, sme, explorer, critic, and test_engineer have WRONG/RIGHT examples
+					// reviewer does NOT have WRONG/RIGHT
+					if (name === 'reviewer') {
+						expect(prompt).not.toContain('WRONG:');
+						expect(prompt).not.toContain('RIGHT:');
+					} else {
+						expect(prompt).toContain('WRONG:');
+						expect(prompt).toContain('RIGHT:');
+					}
 				});
 
 				test('does not contain "No delegation" as a standalone rule', () => {

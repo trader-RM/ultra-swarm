@@ -107,13 +107,47 @@ describe('getAgentConfigs - Architect Task Permission Hotfix', () => {
 			expect(localReviewerConfig.permission).toEqual({ task: 'allow' });
 		});
 
-		test('explorer gets mode:subagent without task permission', () => {
+		test('default explorer (no prefix) gets task:allow permission', () => {
 			const configs = getAgentConfigs();
 			const explorerConfig = configs['explorer'];
 
 			expect(explorerConfig).toBeDefined();
 			expect(explorerConfig.mode).toBe('subagent');
-			expect(explorerConfig.permission).toBeUndefined();
+			expect(explorerConfig.permission).toEqual({ task: 'allow' });
+		});
+
+		test('prefixed explorer (local_explorer) gets task:allow permission', () => {
+			const config = minimalConfig({
+				swarms: {
+					local: {
+						name: 'Local Swarm',
+						agents: {},
+					},
+				},
+			});
+			const configs = getAgentConfigs(config);
+			const localExplorerConfig = configs['local_explorer'];
+
+			expect(localExplorerConfig).toBeDefined();
+			expect(localExplorerConfig.mode).toBe('subagent');
+			expect(localExplorerConfig.permission).toEqual({ task: 'allow' });
+		});
+
+		test('prefixed explorer (cloud_explorer) gets task:allow permission', () => {
+			const config = minimalConfig({
+				swarms: {
+					cloud: {
+						name: 'Cloud Swarm',
+						agents: {},
+					},
+				},
+			});
+			const configs = getAgentConfigs(config);
+			const cloudExplorerConfig = configs['cloud_explorer'];
+
+			expect(cloudExplorerConfig).toBeDefined();
+			expect(cloudExplorerConfig.mode).toBe('subagent');
+			expect(cloudExplorerConfig.permission).toEqual({ task: 'allow' });
 		});
 
 		test('sme gets mode:subagent without task permission', () => {
