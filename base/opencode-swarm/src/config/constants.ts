@@ -16,6 +16,48 @@ export const ALL_SUBAGENT_NAMES = [
 	'curator_phase',
 	...QA_AGENTS,
 	...PIPELINE_AGENTS,
+	// ECC specialist agents (37 total; architect and build excluded)
+	// REVIEW/QA (15): code review, security, language-specific, domain, GAN evaluation, open-source audit
+	'code_reviewer',
+	'csharp_reviewer',
+	'cpp_reviewer',
+	'database_reviewer',
+	'flutter_reviewer',
+	'gan_evaluator',
+	'go_reviewer',
+	'healthcare_reviewer',
+	'java_reviewer',
+	'kotlin_reviewer',
+	'opensource_sanitizer',
+	'python_reviewer',
+	'rust_reviewer',
+	'security_reviewer',
+	'typescript_reviewer',
+	// BUILD (8): language-specific build resolvers + general build-error-resolver
+	'build_error_resolver',
+	'cpp_build_resolver',
+	'dart_build_resolver',
+	'go_build_resolver',
+	'java_build_resolver',
+	'kotlin_build_resolver',
+	'pytorch_build_resolver',
+	'rust_build_resolver',
+	// PIPELINE (7): TDD, E2E, refactoring, performance, GAN generation, open-source packaging
+	'e2e_runner',
+	'gan_generator',
+	'opensource_forker',
+	'opensource_packager',
+	'performance_optimizer',
+	'refactor_cleaner',
+	'tdd_guide',
+	// SUPPORT (7): planning, docs, harness, loop ops, communication, GAN planning
+	'chief_of_staff',
+	'docs_lookup',
+	'doc_updater',
+	'gan_planner',
+	'harness_optimizer',
+	'loop_operator',
+	'planner',
 ] as const;
 
 export const ALL_AGENT_NAMES = [
@@ -210,6 +252,218 @@ export const AGENT_TOOL_MAP: Record<AgentName, ToolName[]> = {
 	// Curator agents are read-only analysis roles — knowledge recall only
 	curator_init: ['knowledge_recall'],
 	curator_phase: ['knowledge_recall'],
+	// ── ECC specialist agents ─────────────────────────────────────────────
+	// REVIEW/QA (15): mirrors Swarm reviewer toolset
+	code_reviewer: [
+		'diff', 'imports', 'lint', 'pkg_audit', 'pre_check_batch',
+		'secretscan', 'symbols', 'complexity_hotspots', 'retrieve_summary',
+		'extract_code_blocks', 'test_runner', 'sast_scan', 'placeholder_scan',
+		'knowledge_recall', 'search', 'batch_symbols', 'suggest_patch', 'repo_map',
+	],
+	csharp_reviewer: [
+		'diff', 'imports', 'lint', 'pkg_audit', 'pre_check_batch',
+		'secretscan', 'symbols', 'complexity_hotspots', 'retrieve_summary',
+		'extract_code_blocks', 'test_runner', 'sast_scan', 'placeholder_scan',
+		'knowledge_recall', 'search', 'batch_symbols', 'suggest_patch', 'repo_map',
+	],
+	cpp_reviewer: [
+		'diff', 'imports', 'lint', 'pkg_audit', 'pre_check_batch',
+		'secretscan', 'symbols', 'complexity_hotspots', 'retrieve_summary',
+		'extract_code_blocks', 'test_runner', 'sast_scan', 'placeholder_scan',
+		'knowledge_recall', 'search', 'batch_symbols', 'suggest_patch', 'repo_map',
+	],
+	database_reviewer: [
+		'diff', 'imports', 'lint', 'pkg_audit', 'pre_check_batch',
+		'secretscan', 'symbols', 'complexity_hotspots', 'retrieve_summary',
+		'extract_code_blocks', 'test_runner', 'sast_scan', 'placeholder_scan',
+		'knowledge_recall', 'search', 'batch_symbols', 'suggest_patch', 'repo_map',
+	],
+	flutter_reviewer: [
+		'diff', 'imports', 'lint', 'pkg_audit', 'pre_check_batch',
+		'secretscan', 'symbols', 'complexity_hotspots', 'retrieve_summary',
+		'extract_code_blocks', 'test_runner', 'sast_scan', 'placeholder_scan',
+		'knowledge_recall', 'search', 'batch_symbols', 'suggest_patch', 'repo_map',
+	],
+	gan_evaluator: [
+		'diff', 'imports', 'lint', 'pkg_audit', 'pre_check_batch',
+		'secretscan', 'symbols', 'complexity_hotspots', 'retrieve_summary',
+		'extract_code_blocks', 'test_runner', 'sast_scan', 'placeholder_scan',
+		'knowledge_recall', 'search', 'batch_symbols', 'suggest_patch', 'repo_map',
+	],
+	go_reviewer: [
+		'diff', 'imports', 'lint', 'pkg_audit', 'pre_check_batch',
+		'secretscan', 'symbols', 'complexity_hotspots', 'retrieve_summary',
+		'extract_code_blocks', 'test_runner', 'sast_scan', 'placeholder_scan',
+		'knowledge_recall', 'search', 'batch_symbols', 'suggest_patch', 'repo_map',
+	],
+	healthcare_reviewer: [
+		'diff', 'imports', 'lint', 'pkg_audit', 'pre_check_batch',
+		'secretscan', 'symbols', 'complexity_hotspots', 'retrieve_summary',
+		'extract_code_blocks', 'test_runner', 'sast_scan', 'placeholder_scan',
+		'knowledge_recall', 'search', 'batch_symbols', 'suggest_patch', 'repo_map',
+	],
+	java_reviewer: [
+		'diff', 'imports', 'lint', 'pkg_audit', 'pre_check_batch',
+		'secretscan', 'symbols', 'complexity_hotspots', 'retrieve_summary',
+		'extract_code_blocks', 'test_runner', 'sast_scan', 'placeholder_scan',
+		'knowledge_recall', 'search', 'batch_symbols', 'suggest_patch', 'repo_map',
+	],
+	kotlin_reviewer: [
+		'diff', 'imports', 'lint', 'pkg_audit', 'pre_check_batch',
+		'secretscan', 'symbols', 'complexity_hotspots', 'retrieve_summary',
+		'extract_code_blocks', 'test_runner', 'sast_scan', 'placeholder_scan',
+		'knowledge_recall', 'search', 'batch_symbols', 'suggest_patch', 'repo_map',
+	],
+	opensource_sanitizer: [
+		'diff', 'imports', 'lint', 'pkg_audit', 'pre_check_batch',
+		'secretscan', 'symbols', 'complexity_hotspots', 'retrieve_summary',
+		'extract_code_blocks', 'test_runner', 'sast_scan', 'placeholder_scan',
+		'knowledge_recall', 'search', 'batch_symbols', 'suggest_patch', 'repo_map',
+	],
+	python_reviewer: [
+		'diff', 'imports', 'lint', 'pkg_audit', 'pre_check_batch',
+		'secretscan', 'symbols', 'complexity_hotspots', 'retrieve_summary',
+		'extract_code_blocks', 'test_runner', 'sast_scan', 'placeholder_scan',
+		'knowledge_recall', 'search', 'batch_symbols', 'suggest_patch', 'repo_map',
+	],
+	rust_reviewer: [
+		'diff', 'imports', 'lint', 'pkg_audit', 'pre_check_batch',
+		'secretscan', 'symbols', 'complexity_hotspots', 'retrieve_summary',
+		'extract_code_blocks', 'test_runner', 'sast_scan', 'placeholder_scan',
+		'knowledge_recall', 'search', 'batch_symbols', 'suggest_patch', 'repo_map',
+	],
+	security_reviewer: [
+		'diff', 'imports', 'lint', 'pkg_audit', 'pre_check_batch',
+		'secretscan', 'symbols', 'complexity_hotspots', 'retrieve_summary',
+		'extract_code_blocks', 'test_runner', 'sast_scan', 'placeholder_scan',
+		'knowledge_recall', 'search', 'batch_symbols', 'suggest_patch', 'repo_map',
+	],
+	typescript_reviewer: [
+		'diff', 'imports', 'lint', 'pkg_audit', 'pre_check_batch',
+		'secretscan', 'symbols', 'complexity_hotspots', 'retrieve_summary',
+		'extract_code_blocks', 'test_runner', 'sast_scan', 'placeholder_scan',
+		'knowledge_recall', 'search', 'batch_symbols', 'suggest_patch', 'repo_map',
+	],
+	// BUILD (8): mirrors Swarm coder toolset
+	build_error_resolver: [
+		'diff', 'imports', 'lint', 'symbols', 'extract_code_blocks',
+		'retrieve_summary', 'search', 'build_check', 'syntax_check',
+		'knowledge_add', 'knowledge_recall', 'repo_map',
+	],
+	cpp_build_resolver: [
+		'diff', 'imports', 'lint', 'symbols', 'extract_code_blocks',
+		'retrieve_summary', 'search', 'build_check', 'syntax_check',
+		'knowledge_add', 'knowledge_recall', 'repo_map',
+	],
+	dart_build_resolver: [
+		'diff', 'imports', 'lint', 'symbols', 'extract_code_blocks',
+		'retrieve_summary', 'search', 'build_check', 'syntax_check',
+		'knowledge_add', 'knowledge_recall', 'repo_map',
+	],
+	go_build_resolver: [
+		'diff', 'imports', 'lint', 'symbols', 'extract_code_blocks',
+		'retrieve_summary', 'search', 'build_check', 'syntax_check',
+		'knowledge_add', 'knowledge_recall', 'repo_map',
+	],
+	java_build_resolver: [
+		'diff', 'imports', 'lint', 'symbols', 'extract_code_blocks',
+		'retrieve_summary', 'search', 'build_check', 'syntax_check',
+		'knowledge_add', 'knowledge_recall', 'repo_map',
+	],
+	kotlin_build_resolver: [
+		'diff', 'imports', 'lint', 'symbols', 'extract_code_blocks',
+		'retrieve_summary', 'search', 'build_check', 'syntax_check',
+		'knowledge_add', 'knowledge_recall', 'repo_map',
+	],
+	pytorch_build_resolver: [
+		'diff', 'imports', 'lint', 'symbols', 'extract_code_blocks',
+		'retrieve_summary', 'search', 'build_check', 'syntax_check',
+		'knowledge_add', 'knowledge_recall', 'repo_map',
+	],
+	rust_build_resolver: [
+		'diff', 'imports', 'lint', 'symbols', 'extract_code_blocks',
+		'retrieve_summary', 'search', 'build_check', 'syntax_check',
+		'knowledge_add', 'knowledge_recall', 'repo_map',
+	],
+	// PIPELINE (7): coder tools + test_runner, pkg_audit, complexity_hotspots
+	e2e_runner: [
+		'diff', 'imports', 'lint', 'symbols', 'extract_code_blocks',
+		'retrieve_summary', 'search', 'build_check', 'syntax_check',
+		'knowledge_add', 'knowledge_recall', 'repo_map', 'test_runner',
+		'pkg_audit', 'complexity_hotspots',
+	],
+	gan_generator: [
+		'diff', 'imports', 'lint', 'symbols', 'extract_code_blocks',
+		'retrieve_summary', 'search', 'build_check', 'syntax_check',
+		'knowledge_add', 'knowledge_recall', 'repo_map', 'test_runner',
+		'pkg_audit', 'complexity_hotspots',
+	],
+	opensource_forker: [
+		'diff', 'imports', 'lint', 'symbols', 'extract_code_blocks',
+		'retrieve_summary', 'search', 'build_check', 'syntax_check',
+		'knowledge_add', 'knowledge_recall', 'repo_map', 'test_runner',
+		'pkg_audit', 'complexity_hotspots',
+	],
+	opensource_packager: [
+		'diff', 'imports', 'lint', 'symbols', 'extract_code_blocks',
+		'retrieve_summary', 'search', 'build_check', 'syntax_check',
+		'knowledge_add', 'knowledge_recall', 'repo_map', 'test_runner',
+		'pkg_audit', 'complexity_hotspots',
+	],
+	performance_optimizer: [
+		'diff', 'imports', 'lint', 'symbols', 'extract_code_blocks',
+		'retrieve_summary', 'search', 'build_check', 'syntax_check',
+		'knowledge_add', 'knowledge_recall', 'repo_map', 'test_runner',
+		'pkg_audit', 'complexity_hotspots',
+	],
+	refactor_cleaner: [
+		'diff', 'imports', 'lint', 'symbols', 'extract_code_blocks',
+		'retrieve_summary', 'search', 'build_check', 'syntax_check',
+		'knowledge_add', 'knowledge_recall', 'repo_map', 'test_runner',
+		'pkg_audit', 'complexity_hotspots',
+	],
+	tdd_guide: [
+		'diff', 'imports', 'lint', 'symbols', 'extract_code_blocks',
+		'retrieve_summary', 'search', 'build_check', 'syntax_check',
+		'knowledge_add', 'knowledge_recall', 'repo_map', 'test_runner',
+		'pkg_audit', 'complexity_hotspots',
+	],
+	// SUPPORT (7): sme+docs merged toolset
+	chief_of_staff: [
+		'complexity_hotspots', 'detect_domains', 'extract_code_blocks', 'gitingest',
+		'imports', 'retrieve_summary', 'schema_drift', 'symbols', 'todo_extract',
+		'knowledge_recall', 'doc_scan', 'repo_map',
+	],
+	docs_lookup: [
+		'complexity_hotspots', 'detect_domains', 'extract_code_blocks', 'gitingest',
+		'imports', 'retrieve_summary', 'schema_drift', 'symbols', 'todo_extract',
+		'knowledge_recall', 'doc_scan', 'repo_map',
+	],
+	doc_updater: [
+		'complexity_hotspots', 'detect_domains', 'extract_code_blocks', 'gitingest',
+		'imports', 'retrieve_summary', 'schema_drift', 'symbols', 'todo_extract',
+		'knowledge_recall', 'doc_scan', 'repo_map',
+	],
+	gan_planner: [
+		'complexity_hotspots', 'detect_domains', 'extract_code_blocks', 'gitingest',
+		'imports', 'retrieve_summary', 'schema_drift', 'symbols', 'todo_extract',
+		'knowledge_recall', 'doc_scan', 'repo_map',
+	],
+	harness_optimizer: [
+		'complexity_hotspots', 'detect_domains', 'extract_code_blocks', 'gitingest',
+		'imports', 'retrieve_summary', 'schema_drift', 'symbols', 'todo_extract',
+		'knowledge_recall', 'doc_scan', 'repo_map',
+	],
+	loop_operator: [
+		'complexity_hotspots', 'detect_domains', 'extract_code_blocks', 'gitingest',
+		'imports', 'retrieve_summary', 'schema_drift', 'symbols', 'todo_extract',
+		'knowledge_recall', 'doc_scan', 'repo_map',
+	],
+	planner: [
+		'complexity_hotspots', 'detect_domains', 'extract_code_blocks', 'gitingest',
+		'imports', 'retrieve_summary', 'schema_drift', 'symbols', 'todo_extract',
+		'knowledge_recall', 'doc_scan', 'repo_map',
+	],
 };
 
 /**

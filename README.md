@@ -8,6 +8,7 @@ Integration workspace for the Ultra Swarm system.
 - **Ralphy** is reserved at `integrations/ralphy/` for later outer-loop watchdog integration.
 - **ECC**, **opencode-agent-skills**, and **OpenSkills** have placeholder directories under `integrations/`.
 - **No behavioral changes have been made yet.** This repo is scaffolding only.
+- **Phase 1 complete:** `.swarm/` infrastructure established (context.md, spec.md, plan.md). Baseline build verified. Git tag `pre-ecc-modifications` created for rollback safety.
 
 ## Structure
 

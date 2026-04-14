@@ -4,8 +4,8 @@
 
 ## Current Policy
 
-- **No implementation logic** is to be added yet.
-- The **Swarm base code** at `base/opencode-swarm/` must remain untouched for now.
-- **Later work** will expose ECC agents and skills into the Swarm architecture.
-- Agent definitions will be written when the integration layer is built.
+- **Implementation is in progress.** ECC agent exposure work (Phase 2+) modifies files in `base/opencode-swarm/`.
+- The **Swarm base code** at `base/opencode-swarm/` may be modified for ECC agent registration, factory functions, category mappings, and architect prompt updates.
+- **Global ECC registry** (`C:\Users\Ryan McNish\.config\opencode\opencode.json`) remains **read-only** — never modified by Ultra Swarm.
+- Agent definitions are being written as part of the integration layer (Phases 2-5).
 
