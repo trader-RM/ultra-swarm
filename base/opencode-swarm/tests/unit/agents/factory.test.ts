@@ -25,15 +25,16 @@ afterEach(() => {
 
 describe('createAgents', () => {
 	describe('no config', () => {
-		it('returns 50 agents (13 native + 37 ECC, docs enabled by default, designer opt-in)', () => {
+		it('returns 52 agents (15 native + 37 ECC, docs enabled by default, designer opt-in)', () => {
 			const agents = createAgents();
-			expect(agents).toHaveLength(50);
+			expect(agents).toHaveLength(52);
 		});
 
 		it('agent names are correct', () => {
 			const agents = createAgents();
 			const names = agents.map((a) => a.name).sort();
 			expect(names).toEqual([
+				'a11y_architect',
 				'architect',
 				'build_error_resolver',
 				'chief_of_staff',
@@ -80,6 +81,7 @@ describe('createAgents', () => {
 				'rust_build_resolver',
 				'rust_reviewer',
 				'security_reviewer',
+				'seo_specialist',
 				'sme',
 				'tdd_guide',
 				'test_engineer',
@@ -160,8 +162,8 @@ describe('createAgents', () => {
 			const agents = createAgents(config as unknown as PluginConfig);
 			const sme = agents.find((a) => a.name === 'sme');
 			expect(sme).toBeUndefined();
-			// 50 agents - 1 disabled = 49 agents (docs still included by default)
-			expect(agents).toHaveLength(49);
+			// 52 agents - 1 disabled = 51 agents (docs still included by default)
+			expect(agents).toHaveLength(51);
 		});
 	});
 
@@ -176,6 +178,7 @@ describe('createAgents', () => {
 			const agents = createAgents(config as unknown as PluginConfig);
 			const names = agents.map((a) => a.name).sort();
 			expect(names).toEqual([
+				'a11y_architect',
 				'architect',
 				'build_error_resolver',
 				'chief_of_staff',
@@ -222,6 +225,7 @@ describe('createAgents', () => {
 				'rust_build_resolver',
 				'rust_reviewer',
 				'security_reviewer',
+				'seo_specialist',
 				'sme',
 				'tdd_guide',
 				'test_engineer',
@@ -242,6 +246,7 @@ describe('createAgents', () => {
 			const agents = createAgents(config as unknown as PluginConfig);
 			const names = agents.map((a) => a.name).sort();
 			expect(names).toEqual([
+				'local_a11y_architect',
 				'local_architect',
 				'local_build_error_resolver',
 				'local_chief_of_staff',
@@ -288,6 +293,7 @@ describe('createAgents', () => {
 				'local_rust_build_resolver',
 				'local_rust_reviewer',
 				'local_security_reviewer',
+				'local_seo_specialist',
 				'local_sme',
 				'local_tdd_guide',
 				'local_test_engineer',
@@ -476,7 +482,7 @@ describe('getAgentConfigs', () => {
 
 		const configs = getAgentConfigs(config as unknown as PluginConfig);
 		expect(configs.sme).toBeUndefined();
-		// 50 agents - 1 disabled = 49 agents (docs included by default)
-		expect(Object.keys(configs)).toHaveLength(49);
+		// 52 agents - 1 disabled = 51 agents (docs included by default)
+		expect(Object.keys(configs)).toHaveLength(51);
 	});
 });

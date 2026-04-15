@@ -57,6 +57,9 @@ export const ALL_SUBAGENT_NAMES = [
 	'loop_operator',
 	'chief_of_staff',
 	'gan_planner',
+	// ECC Design Support agents (2)
+	'a11y_architect',
+	'seo_specialist',
 ] as const;
 
 export const ALL_AGENT_NAMES = [
@@ -886,6 +889,34 @@ export const AGENT_TOOL_MAP: Record<AgentName, ToolName[]> = {
 		'doc_scan',
 		'repo_map',
 	],
+	a11y_architect: [
+		'complexity_hotspots',
+		'detect_domains',
+		'extract_code_blocks',
+		'gitingest',
+		'imports',
+		'retrieve_summary',
+		'schema_drift',
+		'symbols',
+		'todo_extract',
+		'knowledge_recall',
+		'doc_scan',
+		'repo_map',
+	],
+	seo_specialist: [
+		'complexity_hotspots',
+		'detect_domains',
+		'extract_code_blocks',
+		'gitingest',
+		'imports',
+		'retrieve_summary',
+		'schema_drift',
+		'symbols',
+		'todo_extract',
+		'knowledge_recall',
+		'doc_scan',
+		'repo_map',
+	],
 };
 
 /**
@@ -1015,6 +1046,10 @@ export const DEFAULT_MODELS: Record<string, string> = {
 	// Curator agents — lightweight read-only analysis (same model family as explorer)
 	curator_init: 'opencode/trinity-large-preview-free',
 	curator_phase: 'opencode/trinity-large-preview-free',
+
+	// ECC Design Support agents
+	a11y_architect: 'opencode/trinity-large-preview-free',
+	seo_specialist: 'opencode/trinity-large-preview-free',
 
 	// Fallback
 	default: 'opencode/trinity-large-preview-free',

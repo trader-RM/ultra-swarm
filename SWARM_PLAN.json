@@ -1,48 +1,74 @@
 {
   "schema_version": "1.0.0",
-  "title": "Coder ECC Agent Exposure",
+  "title": "Designer ECC Agent Exposure",
   "swarm": "default",
-  "current_phase": 4,
+  "current_phase": 9,
   "phases": [
     {
-      "id": 4,
-      "name": "Expose Coder to ECC Build Resolvers and GAN Generator",
-      "status": "pending",
+      "id": 9,
+      "name": "Register ECC agents and expose Designer to a11y_architect and seo_specialist",
+      "status": "complete",
       "tasks": [
         {
-          "id": "4.1",
-          "phase": 4,
-          "status": "pending",
+          "id": "9.1",
+          "phase": 9,
+          "status": "completed",
           "size": "medium",
-          "description": "Modify coder.ts to add ECC delegation-and-oversight section to CODER_PROMPT. Remove the blanket Task tool prohibition. Add section listing the 9 approved ECC agents (build_error_resolver, cpp_build_resolver, dart_build_resolver, go_build_resolver, java_build_resolver, kotlin_build_resolver, pytorch_build_resolver, rust_build_resolver, gan_generator) with descriptions and delegation rules. Coder defaults to delegation when task matches specialist domain, supervises the result, and remains implementation lane owner. FR-003, FR-004, FR-005.",
+          "description": "Register a11y_architect and seo_specialist in ALL_SUBAGENT_NAMES in constants.ts. Add AGENT_TOOL_MAP entries and DEFAULT_MODELS entries.",
           "depends": [],
-          "acceptance": "CODER_PROMPT contains ECC DELEGATION section with all 9 approved agents and delegation rules. No excluded ECC agents referenced. Blanket Task prohibition removed. Existing non-ECC Coder guidance preserved.",
+          "acceptance": "Both a11y_architect and seo_specialist appear in ALL_SUBAGENT_NAMES, AGENT_TOOL_MAP, and DEFAULT_MODELS.",
           "files_touched": []
         },
         {
-          "id": "4.2",
-          "phase": 4,
-          "status": "pending",
+          "id": "9.2",
+          "phase": 9,
+          "status": "completed",
           "size": "small",
-          "description": "Modify index.ts getAgentConfigs function to add task: 'allow' permission for coder agents (alongside architect agents). Coder remains in subagent mode — only the permission changes, not the mode. FR-001, FR-002.",
-          "depends": [],
-          "acceptance": "Coder agents get { task: 'allow' } in their SDK config. Coder remain in subagent mode. Architect agents still get task: 'allow' as before. No other agent's permission changes.",
+          "description": "Add a11y_architect and seo_specialist to AGENT_CATEGORY and createSwarmAgents.",
+          "depends": [
+            "9.1"
+          ],
+          "acceptance": "Both agents appear in AGENT_CATEGORY and are created in createSwarmAgents.",
           "files_touched": []
         },
         {
-          "id": "4.3",
-          "phase": 4,
-          "status": "pending",
+          "id": "9.3",
+          "phase": 9,
+          "status": "completed",
           "size": "medium",
-          "description": "Add smoke test at base/opencode-swarm/tests/unit/agents/coder-ecc-exposure.test.ts using bun:test framework. Test imports CODER_PROMPT from coder.ts and verifies: (1) all 9 approved ECC agents are named in the prompt, (2) no excluded ECC agents are named, (3) existing non-ECC Coder guidance preserved (ANTI-HALLUCINATION, DEFENSIVE CODING, CROSS-PLATFORM, TEST FRAMEWORK, ERROR HANDLING, OUTPUT FORMAT sections still present), (4) delegation-and-oversight rule is present, (5) Task tool prohibition is qualified not blanket. Also test getAgentConfigs to verify coder gets task: 'allow' and mode remains 'subagent'. FR-010.",
+          "description": "Modify designer.ts to add ECC DELEGATION AND OVERSIGHT section with 2 approved agents.",
           "depends": [],
-          "acceptance": "Test file passes all assertions. Proves 9 approved agents present, 0 excluded agents present, existing guidance preserved, delegation rule present, task permission granted to coder.",
+          "acceptance": "DESIGNER_PROMPT contains ECC DELEGATION section with both approved agents.",
+          "files_touched": []
+        },
+        {
+          "id": "9.4",
+          "phase": 9,
+          "status": "completed",
+          "size": "small",
+          "description": "Add task allow permission for designer in getAgentConfigs.",
+          "depends": [
+            "9.3"
+          ],
+          "acceptance": "Designer gets task allow. Remains subagent mode.",
+          "files_touched": []
+        },
+        {
+          "id": "9.5",
+          "phase": 9,
+          "status": "completed",
+          "size": "medium",
+          "description": "Add smoke test designer-ecc-exposure.test.ts.",
+          "depends": [
+            "9.1",
+            "9.2",
+            "9.3",
+            "9.4"
+          ],
+          "acceptance": "Test passes. Proves 2 approved agents, 0 excluded, guidance preserved.",
           "files_touched": []
         }
       ]
     }
-  ],
-  "migration_status": "native",
-  "specMtime": "2026-04-14T17:30:55.236Z",
-  "specHash": "253a5090fa835399e22706ef294e39d8eaa2310722e4c1a9a578530e4255fdf3"
+  ]
 }

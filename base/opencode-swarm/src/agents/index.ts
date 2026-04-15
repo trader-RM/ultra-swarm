@@ -638,6 +638,28 @@ If you call @coder instead of @${swarmId}_coder, the call will FAIL or go to the
 			agents.push(applyOverrides(agent, swarmAgents, swarmPrefix));
 		}
 	}
+	
+	// Design Support category (2 design-concerned support specialists)
+	for (const eccAgent of [
+		{
+			name: 'a11y_architect',
+			desc: 'Accessibility Architect specializing in WCAG 2.2 compliance for Web and Native platforms. Use PROACTIVELY when designing UI components, establishing design systems, or auditing code for inclusive user experiences.',
+		},
+		{
+			name: 'seo_specialist',
+			desc: 'SEO specialist agent for technical SEO, on-page optimization, structured data, Core Web Vitals, and content strategy.',
+		},
+	] as const) {
+		if (!isAgentDisabled(eccAgent.name, swarmAgents, swarmPrefix)) {
+			const agent = createECCAgent(
+				eccAgent.name,
+				getModel(eccAgent.name),
+				eccAgent.desc,
+			);
+			agent.name = prefixName(eccAgent.name);
+			agents.push(applyOverrides(agent, swarmAgents, swarmPrefix));
+		}
+	}
 
 	return agents;
 }
@@ -742,6 +764,9 @@ export function getAgentConfigs(
 					(sdkConfig.permission as Record<string, 'allow'>) = { task: 'allow' };
 				} else if (baseAgentName === 'docs') {
 					// Docs delegates to ECC doc specialists (doc_updater, docs_lookup)
+					(sdkConfig.permission as Record<string, 'allow'>) = { task: 'allow' };
+				} else if (baseAgentName === 'designer') {
+					// Designer delegates to ECC design specialists (a11y_architect, seo_specialist)
 					(sdkConfig.permission as Record<string, 'allow'>) = { task: 'allow' };
 				}
 			}

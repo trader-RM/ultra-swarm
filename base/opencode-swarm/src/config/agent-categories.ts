@@ -69,6 +69,10 @@ export const AGENT_CATEGORY: Readonly<Record<string, AgentCategory>> = {
 	loop_operator: 'support',
 	chief_of_staff: 'support',
 	gan_planner: 'support',
+
+	// ECC Design Support agents (design-concerned support specialists)
+	a11y_architect: 'support',
+	seo_specialist: 'support',
 } as const;
 
 /**

@@ -1,8 +1,8 @@
-import { describe, test, expect } from 'bun:test';
-import { 
-	ALL_SUBAGENT_NAMES, 
-	AGENT_TOOL_MAP, 
-	DEFAULT_MODELS 
+import { describe, expect, test } from 'bun:test';
+import {
+	ALL_SUBAGENT_NAMES,
+	AGENT_TOOL_MAP,
+	DEFAULT_MODELS,
 } from '../../../src/config/constants';
 
 describe('Agent Registration Constants', () => {

@@ -1,17 +1,50 @@
-import { describe, it, expect } from 'bun:test';
+import { describe, expect, it } from 'bun:test';
 import { DESIGNER_PROMPT } from '../../../src/agents/designer';
-import { ALL_SUBAGENT_NAMES, AGENT_TOOL_MAP, DEFAULT_MODELS } from '../../../src/config/constants';
+import {
+	ALL_SUBAGENT_NAMES,
+	AGENT_TOOL_MAP,
+	DEFAULT_MODELS,
+} from '../../../src/config/constants';
 import { AGENT_CATEGORY } from '../../../src/config/agent-categories';
 
 const EXCLUDED_ECC_AGENTS = [
-	'build_error_resolver', 'cpp_build_resolver', 'go_build_resolver', 'kotlin_build_resolver',
-	'java_build_resolver', 'rust_build_resolver', 'pytorch_build_resolver', 'dart_build_resolver',
-	'code_reviewer', 'security_reviewer', 'cpp_reviewer', 'go_reviewer', 'kotlin_reviewer',
-	'java_reviewer', 'rust_reviewer', 'python_reviewer', 'typescript_reviewer', 'csharp_reviewer',
-	'flutter_reviewer', 'database_reviewer', 'healthcare_reviewer', 'gan_evaluator', 'opensource_sanitizer',
-	'tdd_guide', 'e2e_runner', 'refactor_cleaner', 'performance_optimizer', 'gan_generator',
-	'opensource_forker', 'opensource_packager', 'planner', 'doc_updater', 'docs_lookup',
-	'harness_optimizer', 'loop_operator', 'chief_of_staff', 'gan_planner',
+	'build_error_resolver',
+	'cpp_build_resolver',
+	'go_build_resolver',
+	'kotlin_build_resolver',
+	'java_build_resolver',
+	'rust_build_resolver',
+	'pytorch_build_resolver',
+	'dart_build_resolver',
+	'code_reviewer',
+	'security_reviewer',
+	'cpp_reviewer',
+	'go_reviewer',
+	'kotlin_reviewer',
+	'java_reviewer',
+	'rust_reviewer',
+	'python_reviewer',
+	'typescript_reviewer',
+	'csharp_reviewer',
+	'flutter_reviewer',
+	'database_reviewer',
+	'healthcare_reviewer',
+	'gan_evaluator',
+	'opensource_sanitizer',
+	'tdd_guide',
+	'e2e_runner',
+	'refactor_cleaner',
+	'performance_optimizer',
+	'gan_generator',
+	'opensource_forker',
+	'opensource_packager',
+	'planner',
+	'doc_updater',
+	'docs_lookup',
+	'harness_optimizer',
+	'loop_operator',
+	'chief_of_staff',
+	'gan_planner',
 ];
 
 describe('Designer ECC Agent Exposure — Smoke Test', () => {

@@ -1,24 +1,24 @@
-import { describe, test, expect } from 'bun:test';
-import { 
-	ALL_SUBAGENT_NAMES, 
-	AGENT_TOOL_MAP, 
-	DEFAULT_MODELS, 
-	WRITE_TOOL_NAMES 
-} from '../../../src/config/constants';
-import { AGENT_CATEGORY, getAgentCategory } from '../../../src/config/agent-categories';
+import { describe, expect, test } from 'bun:test';
 import { createAgents } from '../../../src/agents/index';
+import { AGENT_CATEGORY, getAgentCategory } from '../../../src/config/agent-categories';
+import {
+	ALL_SUBAGENT_NAMES,
+	AGENT_TOOL_MAP,
+	DEFAULT_MODELS,
+	WRITE_TOOL_NAMES,
+} from '../../../src/config/constants';
 
 describe('Designer Constants Adversarial Registration', () => {
 	const A11Y = 'a11y_architect';
 	const SEO = 'seo_specialist';
 
 	test('a11y_architect is NOT duplicated in ALL_SUBAGENT_NAMES (appears exactly once)', () => {
-		const occurrences = ALL_SUBAGENT_NAMES.filter(name => name === A11Y).length;
+		const occurrences = ALL_SUBAGENT_NAMES.filter((name) => name === A11Y).length;
 		expect(occurrences).toBe(1);
 	});
 
 	test('seo_specialist is NOT duplicated in ALL_SUBAGENT_NAMES (appears exactly once)', () => {
-		const occurrences = ALL_SUBAGENT_NAMES.filter(name => name === SEO).length;
+		const occurrences = ALL_SUBAGENT_NAMES.filter((name) => name === SEO).length;
 		expect(occurrences).toBe(1);
 	});
 
@@ -36,13 +36,13 @@ describe('Designer Constants Adversarial Registration', () => {
 
 	test('a11y_architect AGENT_TOOL_MAP does NOT contain write or edit tools (read-only support agent)', () => {
 		const tools = AGENT_TOOL_MAP[A11Y] || [];
-		const writeTools = tools.filter(tool => WRITE_TOOL_NAMES.includes(tool as any));
+		const writeTools = tools.filter((tool) => WRITE_TOOL_NAMES.includes(tool as any));
 		expect(writeTools).toEqual([]);
 	});
 
 	test('seo_specialist AGENT_TOOL_MAP does NOT contain write or edit tools (read-only support agent)', () => {
 		const tools = AGENT_TOOL_MAP[SEO] || [];
-		const writeTools = tools.filter(tool => WRITE_TOOL_NAMES.includes(tool as any));
+		const writeTools = tools.filter((tool) => WRITE_TOOL_NAMES.includes(tool as any));
 		expect(writeTools).toEqual([]);
 	});
 
@@ -125,12 +125,14 @@ describe('Designer Constants Adversarial Registration', () => {
 
 	test('createAgents does NOT reference a non-existent agent name', () => {
 		const agents = createAgents({});
-		const registeredNames = agents.map(a => a.name);
-		const fakeAgents = ['ghost_agent', 'mystery_specialist', 'unknown_bot'];
+		const registeredNames = agents.map((a) => a.name);
+		const fakeAgents = [
+			'ghost_agent',
+			'mystery_specialist',
+			'unknown_bot',
+		];
 		for (const fake of fakeAgents) {
 			expect(registeredNames).not.toContain(fake);
 		}
 	});
 });
-;
-;

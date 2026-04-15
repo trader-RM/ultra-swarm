@@ -1,9 +1,11 @@
-# Coder ECC Agent Exposure
+# Designer ECC Agent Exposure
 Swarm: default
-Phase: 4 [PENDING] | Updated: 2026-04-14T17:31:57.014Z
+Phase: 9 [PENDING] | Updated: 2026-04-15T15:01:20.482Z
 
 ---
-## Phase 4: Expose Coder to ECC Build Resolvers and GAN Generator [PENDING]
-- [ ] 4.1: Modify coder.ts to add ECC delegation-and-oversight section to CODER_PROMPT. Remove the blanket Task tool prohibition. Add section listing the 9 approved ECC agents (build_error_resolver, cpp_build_resolver, dart_build_resolver, go_build_resolver, java_build_resolver, kotlin_build_resolver, pytorch_build_resolver, rust_build_resolver, gan_generator) with descriptions and delegation rules. Coder defaults to delegation when task matches specialist domain, supervises the result, and remains implementation lane owner. FR-003, FR-004, FR-005. [MEDIUM]
-- [ ] 4.2: Modify index.ts getAgentConfigs function to add task: 'allow' permission for coder agents (alongside architect agents). Coder remains in subagent mode — only the permission changes, not the mode. FR-001, FR-002. [SMALL]
-- [ ] 4.3: Add smoke test at base/opencode-swarm/tests/unit/agents/coder-ecc-exposure.test.ts using bun:test framework. Test imports CODER_PROMPT from coder.ts and verifies: (1) all 9 approved ECC agents are named in the prompt, (2) no excluded ECC agents are named, (3) existing non-ECC Coder guidance preserved (ANTI-HALLUCINATION, DEFENSIVE CODING, CROSS-PLATFORM, TEST FRAMEWORK, ERROR HANDLING, OUTPUT FORMAT sections still present), (4) delegation-and-oversight rule is present, (5) Task tool prohibition is qualified not blanket. Also test getAgentConfigs to verify coder gets task: 'allow' and mode remains 'subagent'. FR-010. [MEDIUM]
+## Phase 9: Register ECC agents and expose Designer to a11y_architect and seo_specialist [COMPLETE]
+- [x] 9.1: Register a11y_architect and seo_specialist in ALL_SUBAGENT_NAMES in constants.ts. Add AGENT_TOOL_MAP entries and DEFAULT_MODELS entries. [MEDIUM]
+- [x] 9.2: Add a11y_architect and seo_specialist to AGENT_CATEGORY and createSwarmAgents. [SMALL] (depends: 9.1)
+- [x] 9.3: Modify designer.ts to add ECC DELEGATION AND OVERSIGHT section with 2 approved agents. [MEDIUM]
+- [x] 9.4: Add task allow permission for designer in getAgentConfigs. [SMALL] (depends: 9.3)
+- [x] 9.5: Add smoke test designer-ecc-exposure.test.ts. [MEDIUM] (depends: 9.1, 9.2, 9.3, 9.4)
