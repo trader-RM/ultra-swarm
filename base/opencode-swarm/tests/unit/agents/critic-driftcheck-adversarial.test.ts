@@ -65,8 +65,11 @@ describe('critic.ts PHASE DRIFT VERIFIER ADVERSARIAL', () => {
 
 		it('should have RULES section after PHASE VERDICT', () => {
 			const verdictIdx = prompt.indexOf('## PHASE VERDICT');
-			const rulesIdx = prompt.indexOf('RULES:');
-			expect(rulesIdx).toBeGreaterThan(verdictIdx);
+			const rulesIdx = prompt.indexOf('RULES:'); // Finds DELEGATION RULES first (line 326)
+			const finalRulesIdx = prompt.indexOf('- READ-ONLY: no file modifications');
+			
+			// The final RULES section (with READ-ONLY instruction) should come after PHASE VERDICT
+			expect(finalRulesIdx).toBeGreaterThan(verdictIdx);
 		});
 	});
 
@@ -241,28 +244,25 @@ describe('critic.ts PHASE DRIFT VERIFIER ADVERSARIAL', () => {
 		});
 	});
 
-	describe('Identity and Posture', () => {
-		it('should identify as Critic (Phase Drift Verifier)', () => {
-			expect(prompt).toContain('Critic (Phase Drift Verifier)');
-		});
-
-		it('should set DEFAULT POSTURE to SKEPTICAL', () => {
-			expect(prompt).toContain('DEFAULT POSTURE: SKEPTICAL');
-		});
-
-		it('should prohibit delegation via Task tool', () => {
-			expect(prompt).toMatch(/DO NOT use the Task tool to delegate/);
-		});
-
-		it('should instruct to ignore references to other agents', () => {
-			expect(prompt).toMatch(/references to other agents.*IGNORE them/);
-		});
-
-		it('should disambiguate from plan_critic and sounding_board', () => {
-			expect(prompt).toContain('NOT for plan review (use plan_critic)');
-			expect(prompt).toContain('pre-escalation (use sounding_board)');
-		});
+  describe('Identity and Posture', () => {
+	it('should identify as Critic (Phase Drift Verifier)', () => {
+		expect(prompt).toContain('Critic (Phase Drift Verifier)');
 	});
+
+	it('should set DEFAULT POSTURE to SKEPTICAL', () => {
+		expect(prompt).toContain('DEFAULT POSTURE: SKEPTICAL');
+	});
+
+	it('should allow delegation to planner and gan_planner', () => {
+		expect(prompt).toContain('planner');
+		expect(prompt).toContain('gan_planner');
+	});
+
+	it('should disambiguate from plan_critic and sounding_board', () => {
+		expect(prompt).toContain('NOT for plan review (use plan_critic)');
+		expect(prompt).toContain('pre-escalation (use sounding_board)');
+	});
+  });
 
 	describe('PRESSURE IMMUNITY Section', () => {
 		it('should address urgency manufacturing', () => {

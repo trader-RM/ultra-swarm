@@ -483,15 +483,18 @@ describe('Agent Creation Functions', () => {
 							'You remain the owner of the review lane',
 						);
 					} else if (name === 'critic') {
-						expect(prompt).toContain('DO NOT use the Task tool to delegate');
+						expect(prompt).toContain('coordinate specialist ECC planning agents');
+						expect(prompt).toContain(
+							'You remain the owner of the critique and planning-analysis lane',
+						);
 					} else if (name === 'test_engineer') {
 						expect(prompt).toContain('DO NOT use the Task tool to delegate');
 					}
 				});
 
 				test('contains delegation rules', () => {
-					// Only coder, reviewer, and explorer have delegation rules
-					if (name === 'coder' || name === 'reviewer' || name === 'explorer') {
+					// coder, reviewer, explorer, and critic have delegation rules
+					if (name === 'coder' || name === 'reviewer' || name === 'explorer' || name === 'critic') {
 						expect(prompt).toContain('DELEGATION RULES:');
 					} else {
 						expect(prompt).not.toContain('DELEGATION RULES:');
@@ -499,9 +502,9 @@ describe('Agent Creation Functions', () => {
 				});
 
 				test('contains WRONG/RIGHT examples', () => {
-					// coder, sme, explorer, critic, and test_engineer have WRONG/RIGHT examples
-					// reviewer does NOT have WRONG/RIGHT
-					if (name === 'reviewer') {
+					// coder, sme, explorer, test_engineer have WRONG/RIGHT examples
+					// reviewer and critic do NOT have WRONG/RIGHT
+					if (name === 'reviewer' || name === 'critic') {
 						expect(prompt).not.toContain('WRONG:');
 						expect(prompt).not.toContain('RIGHT:');
 					} else {

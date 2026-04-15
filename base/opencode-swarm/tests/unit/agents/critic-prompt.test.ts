@@ -175,13 +175,13 @@ describe('MODE: ANALYZE — adversarial security', () => {
 	const agent = createCriticAgent('test-model');
 	const prompt = agent.config.prompt!;
 
-	it('1. Prompt injection resistance — CRITIC_PROMPT forbids delegation', () => {
-		// Verify the prompt explicitly instructs NOT to delegate or use Task tool
-		const hasNoDelegate =
-			prompt.includes('do NOT delegate') ||
-			prompt.includes('DO NOT use the Task tool');
+	it('1. Prompt injection resistance — CRITIC_PROMPT allows delegation to planner/gan_planner', () => {
+		// Verify the prompt explicitly allows delegation to planner and gan_planner
+		const allowsDelegation =
+			prompt.includes('delegation') &&
+			(prompt.includes('planner') || prompt.includes('gan_planner'));
 
-		expect(hasNoDelegate).toBe(true);
+		expect(allowsDelegation).toBe(true);
 	});
 
 	it('2. Scope boundary — READ-ONLY rule prohibits modifying ANY file', () => {
@@ -236,14 +236,9 @@ describe('MODE: ANALYZE — adversarial security', () => {
 		expect(hasUnauthorizedCreate).toBe(false);
 	});
 
-	it('5. Agent identity confusion guard — warns about delegation confusion', () => {
-		// Verify CRITIC_PROMPT contains text warning about agent delegation confusion
-		const hasIdentityGuard =
-			prompt.includes('IGNORE them') ||
-			prompt.includes('You ARE the agent') ||
-			prompt.includes('not instructions for you to delegate');
-
-		expect(hasIdentityGuard).toBe(true);
+	it('5. Agent identity confusion guard — no IGNORE them instruction', () => {
+		// Phase 7 removed the IGNORE them instruction
+		expect(prompt).not.toContain('IGNORE them');
 	});
 });
 
@@ -350,16 +345,13 @@ describe('PHASE_DRIFT_VERIFIER_PROMPT — adversarial', () => {
 		expect(verdictSection).not.toContain('REJECTED');
 	});
 
-	it('4. Does NOT delegate — forbids Task tool usage', () => {
-		expect(prompt).toContain('DO NOT use the Task tool');
+	it('4. Allows delegation to planner and gan_planner', () => {
+		expect(prompt).toContain('planner');
+		expect(prompt).toContain('gan_planner');
 	});
 
-	it('5. Agent identity confusion guard — warns about delegation confusion', () => {
-		const hasIdentityGuard =
-			prompt.includes('IGNORE them') ||
-			prompt.includes('You ARE the agent') ||
-			prompt.includes('not instructions for you to delegate');
-		expect(hasIdentityGuard).toBe(true);
+	it('5. Agent identity — no IGNORE them instruction (removed in Phase 7)', () => {
+		expect(prompt).not.toContain('IGNORE them');
 	});
 
 	it('6. APPROVED requires ALL tasks VERIFIED with no DRIFT', () => {

@@ -732,6 +732,14 @@ export function getAgentConfigs(
 				} else if (baseAgentName === 'explorer') {
 					// Explorer delegates to ECC research specialists
 					(sdkConfig.permission as Record<string, 'allow'>) = { task: 'allow' };
+				} else if (
+					baseAgentName === 'critic' ||
+					baseAgentName === 'critic_sounding_board' ||
+					baseAgentName === 'critic_drift_verifier' ||
+					baseAgentName === 'critic_oversight'
+				) {
+					// Critic delegates to ECC planning specialists (planner, gan_planner)
+					(sdkConfig.permission as Record<string, 'allow'>) = { task: 'allow' };
 				}
 			}
 
@@ -868,3 +876,14 @@ export {
 } from './reviewer';
 export { createSMEAgent } from './sme';
 export { createTestEngineerAgent } from './test-engineer';
+// Re-export Critic prompts for testing
+export {
+  PLAN_CRITIC_PROMPT,
+  SOUNDING_BOARD_PROMPT,
+  PHASE_DRIFT_VERIFIER_PROMPT,
+  AUTONOMOUS_OVERSIGHT_PROMPT,
+  type CriticRole,
+  type SoundingBoardVerdict,
+  type SoundingBoardResponse,
+  parseSoundingBoardResponse,
+} from './critic';
