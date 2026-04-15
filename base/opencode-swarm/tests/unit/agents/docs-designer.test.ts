@@ -73,18 +73,18 @@ describe('createDocsAgent', () => {
 		expect(agent.config.prompt?.startsWith('## IDENTITY')).toBe(true);
 	});
 
-	test('contains anti-delegation directive', () => {
+	test('contains delegation directive', () => {
 		const agent = createDocsAgent(testModel);
 		const prompt = agent.config.prompt || '';
-		expect(prompt).toContain(
-			'DO NOT use the Task tool to delegate to other agents',
-		);
+		expect(prompt).toContain('APPROVED ECC AGENTS');
+		expect(prompt).toContain('doc_updater');
+		expect(prompt).toContain('docs_lookup');
 	});
 
 	test('contains identity reinforcement', () => {
 		const agent = createDocsAgent(testModel);
 		const prompt = agent.config.prompt || '';
-		expect(prompt).toContain('You ARE the agent that does the work');
+		expect(prompt).toContain('coordinate specialist ECC doc agents');
 	});
 });
 

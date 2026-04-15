@@ -740,6 +740,9 @@ export function getAgentConfigs(
 				) {
 					// Critic delegates to ECC planning specialists (planner, gan_planner)
 					(sdkConfig.permission as Record<string, 'allow'>) = { task: 'allow' };
+				} else if (baseAgentName === 'docs') {
+					// Docs delegates to ECC doc specialists (doc_updater, docs_lookup)
+					(sdkConfig.permission as Record<string, 'allow'>) = { task: 'allow' };
 				}
 			}
 
@@ -866,7 +869,7 @@ export { CODER_PROMPT, createCoderAgent } from './coder';
 export { createCriticAgent } from './critic';
 export { createCuratorAgent } from './curator-agent';
 export { createDesignerAgent } from './designer';
-export { createDocsAgent } from './docs';
+export { createDocsAgent, DOCS_PROMPT } from './docs';
 export { EXPLORER_PROMPT, createExplorerAgent } from './explorer';
 export {
 	createReviewerAgent,
