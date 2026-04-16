@@ -40,8 +40,8 @@ describe('Agent Registration Constants', () => {
 		expect(DEFAULT_MODELS['seo_specialist']).toBe('opencode/trinity-large-preview-free');
 	});
 
-	test('Total agent count in ALL_SUBAGENT_NAMES is 52', () => {
-		expect(ALL_SUBAGENT_NAMES.length).toBe(52);
+	test('Total agent count in ALL_SUBAGENT_NAMES is 59', () => {
+		expect(ALL_SUBAGENT_NAMES.length).toBe(59);
 	});
 
 	test('Existing support agents are still present', () => {

@@ -41,15 +41,19 @@ describe('ADVERSARIAL: Architect Task Permission Edge Cases', () => {
 			expect(isPrimaryMode(config, 'architect')).toBe(true);
 		});
 
-		it('should grant task permission to coder and reviewer, but not other non-architect agents in default swarm', () => {
+		it('should grant task permission to delegation-allowed agents in default swarm', () => {
 			const config = getAgentConfigs(undefined);
+			// Core agents with ECC delegation permission
 			expect(hasTaskPermission(config, 'coder')).toBe(true);
 			expect(hasTaskPermission(config, 'reviewer')).toBe(true);
-			expect(hasTaskPermission(config, 'explorer')).toBe(false);
-			expect(hasTaskPermission(config, 'sme')).toBe(false);
-			expect(hasTaskPermission(config, 'critic')).toBe(false);
-			expect(hasTaskPermission(config, 'test_engineer')).toBe(false);
-			expect(hasTaskPermission(config, 'docs')).toBe(false);
+			expect(hasTaskPermission(config, 'explorer')).toBe(true);
+			expect(hasTaskPermission(config, 'sme')).toBe(true);
+			expect(hasTaskPermission(config, 'test_engineer')).toBe(true);
+			expect(hasTaskPermission(config, 'docs')).toBe(true);
+			expect(hasTaskPermission(config, 'critic')).toBe(true);
+			expect(hasTaskPermission(config, 'curator_init')).toBe(true);
+			expect(hasTaskPermission(config, 'curator_phase')).toBe(true);
+			// designer is ECC-only, not in default swarm — skipped here
 		});
 	});
 
@@ -102,7 +106,7 @@ describe('ADVERSARIAL: Architect Task Permission Edge Cases', () => {
 			expect(isPrimaryMode(config, 'paid_architect')).toBe(true);
 		});
 
-		it('should grant task permission to swarm-prefixed coder and reviewer, but not other non-architects', () => {
+		it('should grant task permission to swarm-prefixed delegation-allowed agents', () => {
 			const config = getAgentConfigs(
 				minimalConfig({
 					swarms: {
@@ -110,14 +114,17 @@ describe('ADVERSARIAL: Architect Task Permission Edge Cases', () => {
 					},
 				}),
 			);
-			// Coder and reviewer agents get task permission for ECC delegation; other non-architects remain without task permission
+			// Core delegation-allowed agents get task permission when swarm-prefixed
 			expect(hasTaskPermission(config, 'cloud_coder')).toBe(true);
 			expect(hasTaskPermission(config, 'cloud_reviewer')).toBe(true);
-			expect(hasTaskPermission(config, 'cloud_explorer')).toBe(false);
-			expect(hasTaskPermission(config, 'cloud_sme')).toBe(false);
-			expect(hasTaskPermission(config, 'cloud_critic')).toBe(false);
-			expect(hasTaskPermission(config, 'cloud_test_engineer')).toBe(false);
-			expect(hasTaskPermission(config, 'cloud_docs')).toBe(false);
+			expect(hasTaskPermission(config, 'cloud_explorer')).toBe(true);
+			expect(hasTaskPermission(config, 'cloud_sme')).toBe(true);
+			expect(hasTaskPermission(config, 'cloud_critic')).toBe(true);
+			expect(hasTaskPermission(config, 'cloud_test_engineer')).toBe(true);
+			expect(hasTaskPermission(config, 'cloud_docs')).toBe(true);
+			expect(hasTaskPermission(config, 'cloud_curator_init')).toBe(true);
+			expect(hasTaskPermission(config, 'cloud_curator_phase')).toBe(true);
+			// cloud_designer is ECC-only, not in default Cloud swarm — skipped here
 		});
 	});
 
@@ -243,11 +250,18 @@ describe('ADVERSARIAL: Architect Task Permission Edge Cases', () => {
 			});
 		});
 
-		it('should set permission to { task: "allow" } for coder and reviewer, undefined for other non-architect agents', () => {
+		it('should set permission to { task: "allow" } for all delegation-allowed agents', () => {
 			const config = getAgentConfigs(undefined);
 			expect(config.coder?.permission).toEqual({ task: 'allow' });
 			expect(config.reviewer?.permission).toEqual({ task: 'allow' });
-			expect(config.explorer?.permission).toBeUndefined();
+			expect(config.explorer?.permission).toEqual({ task: 'allow' });
+			expect(config.sme?.permission).toEqual({ task: 'allow' });
+			expect(config.test_engineer?.permission).toEqual({ task: 'allow' });
+			expect(config.docs?.permission).toEqual({ task: 'allow' });
+			// designer is ECC-only, not in default swarm — permissions checked in designer-specific tests
+			expect(config.critic?.permission).toEqual({ task: 'allow' });
+			expect(config.curator_init?.permission).toEqual({ task: 'allow' });
+			expect(config.curator_phase?.permission).toEqual({ task: 'allow' });
 		});
 
 		it('should set mode to "primary" for architect, "subagent" for others', () => {

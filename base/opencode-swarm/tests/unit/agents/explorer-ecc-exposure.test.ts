@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import { getAgentConfigs, EXPLORER_PROMPT } from '../../../src/agents';
 
-// Approved ECC agents for explorer (2 research specialists)
-const APPROVED_EXPLORER_AGENTS = ['doc_updater', 'docs_lookup'] as const;
+// Approved ECC agents for explorer (3 research specialists)
+const APPROVED_EXPLORER_AGENTS = ['doc_updater', 'docs_lookup', 'code_explorer'] as const;
 
 // Excluded ECC agents (build, pipeline, support, review — NOT approved for explorer)
 const EXCLUDED_BUILD_AGENTS = [
@@ -101,13 +101,13 @@ describe('Explorer ECC Exposure — Phase 5', () => {
 			});
 		}
 
-		test('EXPLORER_PROMPT states delegation count as 2', () => {
-			expect(EXPLORER_PROMPT).toContain('2 agents');
+		test('EXPLORER_PROMPT states delegation count as 3', () => {
+			expect(EXPLORER_PROMPT).toContain('3 agents');
 		});
 
 		test('EXPLORER_PROMPT states delegation-only restriction', () => {
 			expect(EXPLORER_PROMPT).toContain(
-				'You may ONLY delegate to the 2 agents listed above',
+				'You may ONLY delegate to the 3 agents listed above',
 			);
 		});
 	});

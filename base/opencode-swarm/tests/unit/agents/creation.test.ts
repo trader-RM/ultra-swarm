@@ -471,7 +471,8 @@ describe('Agent Creation Functions', () => {
 					if (name === 'coder') {
 						expect(prompt).toContain('coordinate specialist ECC agents');
 					} else if (name === 'sme') {
-						expect(prompt).toContain('DO NOT use the Task tool to delegate');
+						expect(prompt).toContain('You CAN delegate to approved ECC specialist agents when the task matches their domain');
+						expect(prompt).toContain('You remain the owner of the research lane');
 					} else if (name === 'explorer') {
 						expect(prompt).toContain('coordinate specialist ECC research agents');
 						expect(prompt).toContain(
@@ -488,13 +489,14 @@ describe('Agent Creation Functions', () => {
 							'You remain the owner of the critique and planning-analysis lane',
 						);
 					} else if (name === 'test_engineer') {
-						expect(prompt).toContain('DO NOT use the Task tool to delegate');
+						expect(prompt).toContain('You CAN delegate to approved ECC specialist test agents when the task matches their domain');
+						expect(prompt).toContain('You remain the owner of the test lane');
 					}
 				});
 
 				test('contains delegation rules', () => {
-					// coder, reviewer, explorer, and critic have delegation rules
-					if (name === 'coder' || name === 'reviewer' || name === 'explorer' || name === 'critic') {
+					// coder, reviewer, explorer, critic, sme, and test_engineer have delegation rules
+					if (name === 'coder' || name === 'reviewer' || name === 'explorer' || name === 'critic' || name === 'sme' || name === 'test_engineer') {
 						expect(prompt).toContain('DELEGATION RULES:');
 					} else {
 						expect(prompt).not.toContain('DELEGATION RULES:');

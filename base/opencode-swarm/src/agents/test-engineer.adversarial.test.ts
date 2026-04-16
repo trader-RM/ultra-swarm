@@ -218,12 +218,12 @@ describe('SECURITY CONTROL VERIFICATION', () => {
 		expect(agent.config.prompt).toContain('(MANDATORY)');
 	});
 
-	it('should NOT use Task tool for delegation', () => {
+	it('should use Task tool for qualified delegation to approved ECC specialists', () => {
 		const agent = createTestEngineerAgent('gpt-4');
-		// Explicitly tells agent NOT to delegate
-		expect(agent.config.prompt).toContain('you do NOT delegate');
+		// Explicitly tells agent CAN delegate to approved specialists
+		expect(agent.config.prompt).toContain('you CAN delegate to approved ECC specialist test agents');
 		expect(agent.config.prompt).toContain(
-			'You ARE the agent that does the work',
+			'You remain the owner of the test lane',
 		);
 	});
 

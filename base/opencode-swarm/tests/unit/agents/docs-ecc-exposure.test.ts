@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import { getAgentConfigs, DOCS_PROMPT } from '../../../src/agents';
 
-// Approved ECC doc agents for docs (2 doc specialists)
-const APPROVED_DOCS_AGENTS = ['doc_updater', 'docs_lookup'] as const;
+// Approved ECC doc agents for docs (3 doc specialists)
+const APPROVED_DOCS_AGENTS = ['doc_updater', 'docs_lookup', 'comment_analyzer'] as const;
 
 // Excluded ECC agents (build, pipeline, review, support — NOT approved for docs)
 const EXCLUDED_BUILD_AGENTS = [
@@ -94,13 +94,13 @@ describe('Docs ECC Exposure — Phase 8', () => {
 			});
 		}
 
-		test('DOCS_PROMPT states delegation count as 2', () => {
-			expect(DOCS_PROMPT).toContain('2 agents');
+		test('DOCS_PROMPT states delegation count as 3', () => {
+			expect(DOCS_PROMPT).toContain('3 agents');
 		});
 
 		test('DOCS_PROMPT states delegation-only restriction', () => {
 			expect(DOCS_PROMPT).toContain(
-				'You may ONLY delegate to the 2 agents listed above',
+				'You may ONLY delegate to the 3 agents listed above',
 			);
 		});
 	});

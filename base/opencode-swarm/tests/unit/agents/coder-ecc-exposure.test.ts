@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { CODER_PROMPT, getAgentConfigs } from '../../../src/agents';
 
-// Approved ECC agents (build and pipeline resolvers + gan_generator)
+// Approved ECC agents (build and pipeline resolvers + gan_generator + code_simplifier)
 const APPROVED_BUILD_AGENTS = [
 	'build_error_resolver',
 	'cpp_build_resolver',
@@ -13,7 +13,7 @@ const APPROVED_BUILD_AGENTS = [
 	'rust_build_resolver',
 ] as const;
 
-const APPROVED_PIPELINE_AGENTS = ['gan_generator'] as const;
+const APPROVED_PIPELINE_AGENTS = ['gan_generator', 'code_simplifier'] as const;
 
 const APPROVED_ECC_AGENTS = [...APPROVED_BUILD_AGENTS, ...APPROVED_PIPELINE_AGENTS] as const;
 

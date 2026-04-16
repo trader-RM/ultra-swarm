@@ -43,6 +43,8 @@ export const AGENT_CATEGORY: Readonly<Record<string, AgentCategory>> = {
 	healthcare_reviewer: 'qa',
 	gan_evaluator: 'qa',
 	opensource_sanitizer: 'qa',
+	pr_test_analyzer: 'qa',
+	silent_failure_hunter: 'qa',
 
 	// ECC Pipeline agents (build resolvers, generators, and executors)
 	build_error_resolver: 'pipeline',
@@ -60,6 +62,7 @@ export const AGENT_CATEGORY: Readonly<Record<string, AgentCategory>> = {
 	gan_generator: 'pipeline',
 	opensource_forker: 'pipeline',
 	opensource_packager: 'pipeline',
+	code_simplifier: 'pipeline',
 
 	// ECC Support agents (planning, documentation, operations)
 	planner: 'support',
@@ -69,6 +72,10 @@ export const AGENT_CATEGORY: Readonly<Record<string, AgentCategory>> = {
 	loop_operator: 'support',
 	chief_of_staff: 'support',
 	gan_planner: 'support',
+	code_architect: 'support',
+	code_explorer: 'support',
+	comment_analyzer: 'support',
+	conversation_analyzer: 'support',
 
 	// ECC Design Support agents (design-concerned support specialists)
 	a11y_architect: 'support',

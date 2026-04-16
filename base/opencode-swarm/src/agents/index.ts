@@ -434,8 +434,8 @@ If you call @coder instead of @${swarmId}_coder, the call will FAIL or go to the
 		agents.push(applyOverrides(designer, swarmAgents, swarmPrefix));
 	}
 
-	// === ECC Specialist Agent Registration (37 agents) ===
-	// Review/QA category (15 agents)
+	// === ECC Specialist Agent Registration (44 agents) ===
+	// Review/QA category (17 agents)
 	for (const eccAgent of [
 		{
 			name: 'code_reviewer',
@@ -497,6 +497,14 @@ If you call @coder instead of @${swarmId}_coder, the call will FAIL or go to the
 			name: 'opensource_sanitizer',
 			desc: 'Verifies an open-source fork is fully sanitized before release. Scans for leaked secrets, PII, and dangerous files.',
 		},
+		{
+			name: 'pr_test_analyzer',
+			desc: 'Analyzes test result artifacts from CI/CD pipelines and generates structured reports to identify flaky, slow, or broken tests.',
+		},
+		{
+			name: 'silent_failure_hunter',
+			desc: 'Identifies silently failing code paths where errors are caught and swallowed without logging or reporting.',
+		},
 	] as const) {
 		if (!isAgentDisabled(eccAgent.name, swarmAgents, swarmPrefix)) {
 			const agent = createECCAgent(
@@ -555,7 +563,7 @@ If you call @coder instead of @${swarmId}_coder, the call will FAIL or go to the
 		}
 	}
 
-	// Pipeline category (7 pipeline agents)
+	// Pipeline category (8 pipeline agents)
 	for (const eccAgent of [
 		{
 			name: 'tdd_guide',
@@ -585,6 +593,10 @@ If you call @coder instead of @${swarmId}_coder, the call will FAIL or go to the
 			name: 'opensource_packager',
 			desc: 'Generates complete open-source packaging including CLAUDE.md, README, LICENSE, and CONTRIBUTING.',
 		},
+		{
+			name: 'code_simplifier',
+			desc: 'Simplifies and refines code for clarity, consistency, and maintainability while preserving behavior. Focus on recently modified code unless instructed otherwise.',
+		},
 	] as const) {
 		if (!isAgentDisabled(eccAgent.name, swarmAgents, swarmPrefix)) {
 			const agent = createECCAgent(
@@ -597,7 +609,7 @@ If you call @coder instead of @${swarmId}_coder, the call will FAIL or go to the
 		}
 	}
 
-	// Support category (7 support agents)
+	// Support category (11 support agents)
 	for (const eccAgent of [
 		{
 			name: 'planner',
@@ -626,6 +638,22 @@ If you call @coder instead of @${swarmId}_coder, the call will FAIL or go to the
 		{
 			name: 'gan_planner',
 			desc: 'Expands a one-line objective into a full product specification with features, sprints, and evaluation criteria.',
+		},
+		{
+			name: 'code_architect',
+			desc: 'Designs feature architectures by analyzing existing codebase patterns and conventions, then providing implementation blueprints with concrete files, interfaces, data flow, and build order.',
+		},
+		{
+			name: 'code_explorer',
+			desc: 'Deeply analyzes existing codebase features by tracing execution paths, mapping architecture layers, and documenting dependencies to inform new development.',
+		},
+		{
+			name: 'comment_analyzer',
+			desc: 'Analyzes code comments for accuracy, completeness, maintainability, and comment rot risk.',
+		},
+		{
+			name: 'conversation_analyzer',
+			desc: 'Analyzes conversation transcripts to find behaviors worth preventing with hooks.',
 		},
 	] as const) {
 		if (!isAgentDisabled(eccAgent.name, swarmAgents, swarmPrefix)) {
@@ -767,6 +795,18 @@ export function getAgentConfigs(
 					(sdkConfig.permission as Record<string, 'allow'>) = { task: 'allow' };
 				} else if (baseAgentName === 'designer') {
 					// Designer delegates to ECC design specialists (a11y_architect, seo_specialist)
+					(sdkConfig.permission as Record<string, 'allow'>) = { task: 'allow' };
+				} else if (baseAgentName === 'test_engineer') {
+					// Test Engineer delegates to ECC test specialists (e2e_runner, tdd_guide, pr_test_analyzer)
+					(sdkConfig.permission as Record<string, 'allow'>) = { task: 'allow' };
+				} else if (baseAgentName === 'sme') {
+					// SME delegates to ECC specialists (opensource_forker, opensource_packager)
+					(sdkConfig.permission as Record<string, 'allow'>) = { task: 'allow' };
+				} else if (baseAgentName === 'curator_init') {
+					// Curator (Init) delegates to ECC specialist (conversation_analyzer)
+					(sdkConfig.permission as Record<string, 'allow'>) = { task: 'allow' };
+				} else if (baseAgentName === 'curator_phase') {
+					// Curator (Phase) delegates to ECC specialist (conversation_analyzer)
 					(sdkConfig.permission as Record<string, 'allow'>) = { task: 'allow' };
 				}
 			}

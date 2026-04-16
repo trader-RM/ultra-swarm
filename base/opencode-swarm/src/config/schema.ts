@@ -66,7 +66,10 @@ export function stripKnownSwarmPrefix(agentName: string): string {
 	}
 
 	// Strategy 2: Check if the name ENDS with a known agent name (with separator)
-	for (const agent of ALL_AGENT_NAMES) {
+	// Sort by length descending to ensure longest matches are found first
+	// Fixes suffix collision bug where 'architect' would match before 'a11y_architect'
+	const sortedAgentNames = [...ALL_AGENT_NAMES].sort((a, b) => b.length - a.length);
+	for (const agent of sortedAgentNames) {
 		for (const sep of SEPARATORS) {
 			const suffix = sep + agent;
 			if (normalized.endsWith(suffix)) {

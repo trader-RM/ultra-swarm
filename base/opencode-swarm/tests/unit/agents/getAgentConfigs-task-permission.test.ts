@@ -150,22 +150,22 @@ describe('getAgentConfigs - Architect Task Permission Hotfix', () => {
 			expect(cloudExplorerConfig.permission).toEqual({ task: 'allow' });
 		});
 
-		test('sme gets mode:subagent without task permission', () => {
+		test('sme gets mode:subagent with task:allow permission for ECC delegation', () => {
 			const configs = getAgentConfigs();
 			const smeConfig = configs['sme'];
 
 			expect(smeConfig).toBeDefined();
 			expect(smeConfig.mode).toBe('subagent');
-			expect(smeConfig.permission).toBeUndefined();
+			expect(smeConfig.permission).toEqual({ task: 'allow' });
 		});
 
-		test('test_engineer gets mode:subagent without task permission', () => {
+		test('test_engineer gets mode:subagent with task:allow permission for ECC delegation', () => {
 			const configs = getAgentConfigs();
 			const testEngineerConfig = configs['test_engineer'];
 
 			expect(testEngineerConfig).toBeDefined();
 			expect(testEngineerConfig.mode).toBe('subagent');
-			expect(testEngineerConfig.permission).toBeUndefined();
+			expect(testEngineerConfig.permission).toEqual({ task: 'allow' });
 		});
 
 		// Adversarial: ECC agents that are NOT coder must NOT get task:allow

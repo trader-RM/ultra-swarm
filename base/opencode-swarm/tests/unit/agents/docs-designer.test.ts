@@ -144,18 +144,18 @@ describe('createDesignerAgent', () => {
 		expect(agent.config.prompt?.startsWith('## IDENTITY')).toBe(true);
 	});
 
-	test('contains anti-delegation directive', () => {
+	test('contains ECC delegation section', () => {
 		const agent = createDesignerAgent(testModel);
 		const prompt = agent.config.prompt || '';
-		expect(prompt).toContain(
-			'DO NOT use the Task tool to delegate to other agents',
-		);
+		expect(prompt).toContain('## ECC DELEGATION AND OVERSIGHT');
+		expect(prompt).toContain('QUALIFIED DELEGATION ONLY');
 	});
 
-	test('contains identity reinforcement', () => {
+	test('contains ECC-approved agents', () => {
 		const agent = createDesignerAgent(testModel);
 		const prompt = agent.config.prompt || '';
-		expect(prompt).toContain('You ARE the agent that does the work');
+		expect(prompt).toContain('a11y_architect');
+		expect(prompt).toContain('seo_specialist');
 	});
 
 	test('contains WCAG AA contrast requirements', () => {

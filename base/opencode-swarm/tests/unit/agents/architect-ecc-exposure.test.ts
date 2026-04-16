@@ -2,14 +2,13 @@ import { describe, expect, it } from 'bun:test';
 import { ARCHITECT_PROMPT } from '../../../src/agents/architect';
 
 describe('Architect prompt ECC agent exposure', () => {
-	it('includes harness_optimizer in AGENTS section', () => {
-		expect(ARCHITECT_PROMPT).toContain('harness_optimizer');
-		expect(ARCHITECT_PROMPT).toContain('harness_optimizer - Analyzes');
+	it('includes code_architect in AGENTS section', () => {
+		expect(ARCHITECT_PROMPT).toContain('code_architect');
+		expect(ARCHITECT_PROMPT).toContain('code_architect - Designs');
 	});
 
-	it('includes loop_operator in AGENTS section', () => {
-		expect(ARCHITECT_PROMPT).toContain('loop_operator');
-		expect(ARCHITECT_PROMPT).toContain('loop_operator - Operates');
+	it('includes code_architect in Your agents line', () => {
+		expect(ARCHITECT_PROMPT).toContain('{{AGENT_PREFIX}}code_architect');
 	});
 
 	it('excludes chief_of_staff Support agent', () => {

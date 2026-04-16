@@ -90,20 +90,20 @@ describe('explorer-role-boundary', () => {
 		 * Note: "rejected" appears in "deviations will be rejected" which is
 		 * about output format, not explorer making approval decisions.
 		 */
-		test('approve does not appear as an Explorer action', () => {
+		test('approve does not appear as an Explorer action (except in delegation context)', () => {
 			const approveLines = EXPLORER_PROMPT.split('\n')
 				.map((l) => l.trim())
-				.filter((l) => /approve/i.test(l) && !/deviations.*rejected/i.test(l));
+				.filter((l) => /approve/i.test(l) && !/deviations.*rejected/i.test(l) && !/APPROVED.*delegation/i.test(l));
 			expect(approveLines).toHaveLength(0);
 		});
 
-		test('reject does not appear as an Explorer action', () => {
+		test('reject does not appear as an Explorer action (except in ECC context)', () => {
 			const rejectLines = EXPLORER_PROMPT.split('\n')
 				.map((l) => l.trim())
 				.filter(
 					(l) =>
 						/reject/i.test(l) &&
-						!/deviations.*rejected|will be rejected/i.test(l),
+						!/deviations.*rejected|will be rejected|ECC.*delegation.*allowed/i.test(l),
 				);
 			expect(rejectLines).toHaveLength(0);
 		});
@@ -199,21 +199,26 @@ describe('explorer-role-boundary', () => {
 	// -------------------------------------------------------------------
 
 	describe('agent-routing', () => {
-		/**
-		 * Explorer explicitly must NOT delegate to other agents.
-		 * The prompt says "DO NOT use the Task tool to delegate".
-		 * This is correct behavior (prohibition, not overreach).
-		 */
-		test('explorer is explicitly prohibited from delegating to other agents', () => {
-			const delegateLines = linesContaining('delegate to');
-			expect(delegateLines.length).toBeGreaterThan(0);
+	/**
+	 * Explorer CAN delegate to approved ECC specialist agents.
+	 * The prompt says "you CAN delegate to approved ECC specialist agents".
+	 */
+	test('explorer can delegate to approved ECC specialist agents', () => {
+		const delegateLines = linesContaining('delegate to');
+		expect(delegateLines.length).toBeGreaterThan(0);
 
-			// All "delegate to" mentions must be NEGATIVE (do not delegate)
-			for (const line of delegateLines) {
-				const isNegative = /do not|don't|never|not.*delegate/i.test(line);
-				expect(isNegative).toBe(true);
-			}
-		});
+		// At least one line must be POSITIVE (can delegate)
+		const hasPositiveDelegation = delegateLines.some(line => /CAN delegate|you can/i.test(line));
+		expect(hasPositiveDelegation).toBe(true);
+		
+		// Negative delegation lines are only allowed as RESTRICTIONS (ONLY/NOT)
+		// not as blanket prohibitions (NEVER/DO NOT use Task tool)
+		for (const line of delegateLines) {
+			const isPositive = /CAN delegate|you can/i.test(line);
+			const isRestriction = /ONLY delegate|NOT delegate/i.test(line);
+			expect(isPositive || isRestriction).toBe(true);
+		}
+	});
 
 		test('prompt does not contain next-agent', () => {
 			const nextAgentLines = linesContaining('next-agent');
@@ -261,7 +266,7 @@ describe('explorer-role-boundary', () => {
 
 	describe('role-identity', () => {
 		/**
-		 * Explorer must be explicitly described as read-only or similar.
+		 * Explorer must be explicitly described as read-only or similar, but can coordinate specialist research agents.
 		 */
 		test('explorer is described as read-only or discovers-and-summarizes', () => {
 			const readOnly = /read.?only/i.test(EXPLORER_PROMPT);
@@ -273,8 +278,11 @@ describe('explorer-role-boundary', () => {
 			// Also accept "analyze codebases directly" as identity statement
 			const analyzesDirectly =
 				/analyz(?:e|es|ing)\s+codebases?\s+directly/i.test(EXPLORER_PROMPT);
+			// Also accept "coordinate specialist ECC research agents"
+			const coordinatesSpecialists =
+				/coordinate specialist.*ECC.*agents/i.test(EXPLORER_PROMPT);
 
-			expect(readOnly || discoveryPattern || analyzesDirectly).toBe(true);
+			expect(readOnly || discoveryPattern || analyzesDirectly || coordinatesSpecialists).toBe(true);
 		});
 
 		/**
@@ -289,8 +297,8 @@ describe('explorer-role-boundary', () => {
 		});
 
 		/**
-		 * Explorer does not make judgments — verified by explicit "do not
-		 * make judgments/decisions/verdicts" or equivalent language.
+		 * Explorer does not make final judgments, but coordinates specialist research agents — verified by explicit "do not
+		 * make judgments/decisions/verdicts" or equivalent language, plus delegation coordination.
 		 */
 		test('explorer explicitly does not make final judgments', () => {
 			// Either "does not make judgments/decisions" OR the IDENTITY section
@@ -303,8 +311,11 @@ describe('explorer-role-boundary', () => {
 				/factual\s*mapper|analyzes? (codebases? )?directly/i.test(
 					EXPLORER_PROMPT,
 				);
+			// Also accept that explorer coordinates specialists rather than making final judgments
+			const coordinatesSpecialists =
+				/coordinate specialist.*ECC.*agents/i.test(EXPLORER_PROMPT);
 
-			expect(noJudgment || isFactualMapper).toBe(true);
+			expect(noJudgment || isFactualMapper || coordinatesSpecialists).toBe(true);
 		});
 	});
 

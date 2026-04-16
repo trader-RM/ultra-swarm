@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { getAgentConfigs, REVIEWER_PROMPT } from '../../../src/agents';
 
-// Approved ECC review agents (17 that exist in ALL_SUBAGENT_NAMES)
+// Approved ECC review agents (18 that exist in ALL_SUBAGENT_NAMES)
 const APPROVED_REVIEW_AGENTS = [
 	'code_reviewer',
 	'csharp_reviewer',
@@ -19,13 +19,13 @@ const APPROVED_REVIEW_AGENTS = [
 	'refactor_cleaner',
 	'rust_reviewer',
 	'security_reviewer',
+	'silent_failure_hunter',
 	'typescript_reviewer',
 ] as const;
 
 // Agents that do NOT exist in ALL_SUBAGENT_NAMES — skipped per user instruction
 const SKIPPED_NONEXISTENT_AGENTS = [
 	'code_simplifier',
-	'silent_failure_hunter',
 	'type_design_analyzer',
 ] as const;
 
@@ -122,13 +122,13 @@ describe('Reviewer ECC Exposure — Phase 5', () => {
 			});
 		}
 
-		test('REVIEWER_PROMPT states delegation count as 17', () => {
-			expect(REVIEWER_PROMPT).toContain('17 agents');
+		test('REVIEWER_PROMPT states delegation count as 18', () => {
+			expect(REVIEWER_PROMPT).toContain('18 agents');
 		});
 
 		test('REVIEWER_PROMPT states delegation-only restriction', () => {
 			expect(REVIEWER_PROMPT).toContain(
-				'You may ONLY delegate to the 17 agents listed above',
+				'You may ONLY delegate to the 18 agents listed above',
 			);
 		});
 	});
