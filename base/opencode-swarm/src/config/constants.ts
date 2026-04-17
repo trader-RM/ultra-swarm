@@ -67,6 +67,15 @@ export const ALL_SUBAGENT_NAMES = [
 	// ECC Design Support agents (2)
 	'a11y_architect',
 	'seo_specialist',
+	// ECC Tool-backed agents (8)
+	'completion_verify',
+	'convene_council',
+	'declare_council_criteria',
+	'sbom_generate',
+	'checkpoint',
+	'co_change_analyzer',
+	'doc_scan',
+	'doc_extract',
 ] as const;
 
 export const ALL_AGENT_NAMES = [
@@ -1025,6 +1034,15 @@ export const AGENT_TOOL_MAP: Record<AgentName, ToolName[]> = {
 		'suggest_patch',
 		'repo_map',
 	],
+	// ECC Tool-backed agents (8)
+	completion_verify: ['completion_verify'],
+	convene_council: ['convene_council'],
+	declare_council_criteria: ['declare_council_criteria'],
+	sbom_generate: ['sbom_generate'],
+	checkpoint: ['checkpoint'],
+	co_change_analyzer: ['co_change_analyzer'],
+	doc_scan: ['doc_scan'],
+	doc_extract: ['doc_extract'],
 };
 
 /**
@@ -1167,6 +1185,16 @@ export const DEFAULT_MODELS: Record<string, string> = {
 	conversation_analyzer: 'opencode/trinity-large-preview-free',
 	pr_test_analyzer: 'opencode/gpt-5-nano',
 	silent_failure_hunter: 'opencode/big-pickle',
+
+	// ECC Tool-backed agents (8)
+	completion_verify: 'opencode/trinity-large-preview-free',
+	convene_council: 'opencode/trinity-large-preview-free',
+	declare_council_criteria: 'opencode/trinity-large-preview-free',
+	sbom_generate: 'opencode/trinity-large-preview-free',
+	checkpoint: 'opencode/trinity-large-preview-free',
+	co_change_analyzer: 'opencode/trinity-large-preview-free',
+	doc_scan: 'opencode/trinity-large-preview-free',
+	doc_extract: 'opencode/trinity-large-preview-free',
 
 	// Fallback
 	default: 'opencode/trinity-large-preview-free',

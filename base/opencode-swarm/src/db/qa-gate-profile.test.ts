@@ -80,11 +80,12 @@ describe('qa-gate-profile', () => {
 		);
 	});
 
-	test('setGates allows false on an already-disabled gate (no-op)', () => {
+	test('setGates rejects attempts to disable council_mode when it defaults to true (ratchet behavior)', () => {
 		getOrCreateProfile(tempDir, 'plan-1');
-		// council_mode defaults to false; passing false is a no-op, not an error.
-		const result = setGates(tempDir, 'plan-1', { council_mode: false });
-		expect(result.gates.council_mode).toBe(false);
+		// council_mode now defaults to true; passing false should be rejected with ratchet error.
+		expect(() => setGates(tempDir, 'plan-1', { council_mode: false })).toThrow(
+			/ratchet/i,
+		);
 	});
 
 	test('setGates throws on missing profile', () => {
@@ -132,7 +133,14 @@ describe('qa-gate-profile', () => {
 		const h1 = computeProfileHash(p1);
 		expect(h1).toMatch(/^[0-9a-f]{64}$/);
 
-		const p2 = setGates(tempDir, 'plan-1', { council_mode: true });
+		// Create a synthetic profile with one gate toggled to ensure hash differs
+		const p2 = {
+			...p1,
+			gates: {
+				...p1.gates,
+				council_mode: !p1.gates.council_mode, // Flip the council_mode value
+			},
+		};
 		const h2 = computeProfileHash(p2);
 		expect(h2).not.toBe(h1);
 	});

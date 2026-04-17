@@ -242,26 +242,21 @@ describe('ADVERSARIAL: Architect Task Permission Edge Cases', () => {
 	});
 
 	describe('Permission object structure validation', () => {
-		it('should set permission to { task: "allow" } for architect agents', () => {
+		it('should set permission to { task: "allow" } for all delegation-allowed agents', () => {
 			const config = getAgentConfigs(undefined);
-			// Use type assertion to bypass SDK type checking
 			expect(config.architect?.permission as { task: string }).toEqual({
 				task: 'allow',
 			});
-		});
-
-		it('should set permission to { task: "allow" } for all delegation-allowed agents', () => {
-			const config = getAgentConfigs(undefined);
-			expect(config.coder?.permission).toEqual({ task: 'allow' });
-			expect(config.reviewer?.permission).toEqual({ task: 'allow' });
-			expect(config.explorer?.permission).toEqual({ task: 'allow' });
-			expect(config.sme?.permission).toEqual({ task: 'allow' });
-			expect(config.test_engineer?.permission).toEqual({ task: 'allow' });
-			expect(config.docs?.permission).toEqual({ task: 'allow' });
+			expect(config.coder?.permission as { task: string }).toEqual({ task: 'allow' });
+			expect(config.reviewer?.permission as { task: string }).toEqual({ task: 'allow' });
+			expect(config.explorer?.permission as { task: string }).toEqual({ task: 'allow' });
+			expect(config.sme?.permission as { task: string }).toEqual({ task: 'allow' });
+			expect(config.test_engineer?.permission as { task: string }).toEqual({ task: 'allow' });
+			expect(config.docs?.permission as { task: string }).toEqual({ task: 'allow' });
 			// designer is ECC-only, not in default swarm — permissions checked in designer-specific tests
-			expect(config.critic?.permission).toEqual({ task: 'allow' });
-			expect(config.curator_init?.permission).toEqual({ task: 'allow' });
-			expect(config.curator_phase?.permission).toEqual({ task: 'allow' });
+			expect(config.critic?.permission as { task: string }).toEqual({ task: 'allow' });
+			expect(config.curator_init?.permission as { task: string }).toEqual({ task: 'allow' });
+			expect(config.curator_phase?.permission as { task: string }).toEqual({ task: 'allow' });
 		});
 
 		it('should set mode to "primary" for architect, "subagent" for others', () => {

@@ -29,10 +29,10 @@ export interface QaGates {
 export const DEFAULT_QA_GATES: QaGates = {
 	reviewer: true,
 	test_engineer: true,
-	council_mode: false,
+	council_mode: true,
 	sme_enabled: true,
 	critic_pre_plan: true,
-	hallucination_guard: false,
+	hallucination_guard: true,
 	sast_enabled: true,
 };
 

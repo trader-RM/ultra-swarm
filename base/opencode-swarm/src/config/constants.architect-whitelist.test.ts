@@ -1,6 +1,6 @@
 /**
- * Verification tests for architect whitelist addition of check_gate_status
- * Tests that AGENT_TOOL_MAP.architect includes check_gate_status and other roles are unchanged
+ * Verification tests for architect whitelist updates
+ * Tests that AGENT_TOOL_MAP.architect includes all expected tools and other roles have correct counts
  */
 import { describe, expect, it } from 'bun:test';
 import type { ToolName } from '../tools/tool-names';
@@ -9,12 +9,12 @@ import { AGENT_TOOL_MAP } from './constants';
 describe('AGENT_TOOL_MAP.architect whitelist verification', () => {
 	// Store expected tool counts for each role (excluding architect which we're testing)
 	const OTHER_ROLE_EXPECTED_TOOLS: Record<string, number> = {
-		explorer: 13,
-		coder: 11,
+		explorer: 14,
+		coder: 12,
 		test_engineer: 11,
 		sme: 8,
-		reviewer: 17,
-		critic: 7,
+		reviewer: 18,
+		critic: 8,
 		docs: 9,
 		designer: 4,
 	};
@@ -33,10 +33,10 @@ describe('AGENT_TOOL_MAP.architect whitelist verification', () => {
 			expect(hasValidToolName).toBe(true);
 		});
 
-		it('architect should have expected total tool count (43 tools including lint_spec)', () => {
+		it('architect should have expected total tool count (48 tools including new additions)', () => {
 			const architectTools = AGENT_TOOL_MAP.architect;
-			// Expected: 43 tools
-			expect(architectTools.length).toBe(43);
+			// Expected: 48 tools
+			expect(architectTools.length).toBe(48);
 		});
 	});
 
@@ -62,6 +62,8 @@ describe('AGENT_TOOL_MAP.architect whitelist verification', () => {
 			'check_gate_status',
 			'completion_verify',
 			'complexity_hotspots',
+			'convene_council',
+			'declare_council_criteria',
 			'detect_domains',
 			'evidence_check',
 			'extract_code_blocks',
@@ -101,6 +103,9 @@ describe('AGENT_TOOL_MAP.architect whitelist verification', () => {
 			'knowledge_remove',
 			'co_change_analyzer',
 			'suggest_patch',
+			'repo_map',
+			'get_qa_gate_profile',
+			'set_qa_gates',
 		];
 
 		it('architect should have exact expected tools', () => {
