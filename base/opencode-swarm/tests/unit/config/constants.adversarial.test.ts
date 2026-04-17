@@ -31,8 +31,13 @@ describe('constants.ts Adversarial', () => {
 		});
 
 		it('No agent should have an empty tool list unless explicitly intended (SME/Docs etc should have some)', () => {
+			// Agents intentionally allowed to have an empty swarm tool list:
+			// type_design_analyzer — native-tools-only ECC agent; Read/Grep/Glob/Bash pass through
+			// via AgentConfig.permission and are not governed by this map.
+			const INTENTIONALLY_EMPTY: string[] = ['type_design_analyzer'];
 			for (const [agent, tools] of Object.entries(AGENT_TOOL_MAP)) {
-				// curator_init/phase and conversation_analyzer are'lightweight' but should still have knowledge_recall
+				if (INTENTIONALLY_EMPTY.includes(agent)) continue;
+				// curator_init/phase and conversation_analyzer are 'lightweight' but should still have knowledge_recall
 				expect(tools.length).toBeGreaterThan(0);
 			}
 		});

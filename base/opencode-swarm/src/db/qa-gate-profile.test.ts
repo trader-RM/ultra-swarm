@@ -65,11 +65,12 @@ describe('qa-gate-profile', () => {
 		expect(a.id).toBe(b.id);
 	});
 
-	test('setGates can enable additional gates (ratchet tighter)', () => {
+	test('setGates accepts setting an already-enabled gate without error (idempotent)', () => {
 		getOrCreateProfile(tempDir, 'plan-1');
 		const updated = setGates(tempDir, 'plan-1', { council_mode: true });
 		expect(updated.gates.council_mode).toBe(true);
-		// Defaults preserved
+		// council_mode is already true by default; this is a no-op, not a ratchet.
+		// The false→true ratchet path is covered by the explicit-false test below.
 		expect(updated.gates.reviewer).toBe(true);
 	});
 
@@ -86,6 +87,20 @@ describe('qa-gate-profile', () => {
 		expect(() => setGates(tempDir, 'plan-1', { council_mode: false })).toThrow(
 			/ratchet/i,
 		);
+	});
+
+	test('setGates ratchets a gate from false to true when explicitly set', () => {
+		// Directly insert a profile with one gate set to false so we can exercise
+		// the false→true ratchet code path (all production defaults are now true).
+		const db = getProjectDb(tempDir);
+		db.run(
+			'INSERT INTO qa_gate_profile (plan_id, gates) VALUES (?, ?)',
+			['plan-ratchet', JSON.stringify({ ...DEFAULT_QA_GATES, hallucination_guard: false })],
+		);
+		const updated = setGates(tempDir, 'plan-ratchet', { hallucination_guard: true });
+		expect(updated.gates.hallucination_guard).toBe(true);
+		// Other gates must remain unchanged
+		expect(updated.gates.reviewer).toBe(true);
 	});
 
 	test('setGates throws on missing profile', () => {
@@ -145,7 +160,7 @@ describe('qa-gate-profile', () => {
 		expect(h2).not.toBe(h1);
 	});
 
-	test('getEffectiveGates ratchets tighter via session overrides', () => {
+	test('getEffectiveGates ignores session override when gate already enabled (idempotent)', () => {
 		const p = getOrCreateProfile(tempDir, 'plan-1');
 		const eff = getEffectiveGates(p, { council_mode: true });
 		expect(eff.council_mode).toBe(true);
