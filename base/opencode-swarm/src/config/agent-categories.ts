@@ -26,61 +26,6 @@ export const AGENT_CATEGORY: Readonly<Record<string, AgentCategory>> = {
 	designer: 'support',
 	curator_init: 'support',
 	curator_phase: 'support',
-
-	// ECC Review/QA agents (specialized reviewers and evaluators)
-	code_reviewer: 'qa',
-	security_reviewer: 'qa',
-	cpp_reviewer: 'qa',
-	go_reviewer: 'qa',
-	kotlin_reviewer: 'qa',
-	java_reviewer: 'qa',
-	rust_reviewer: 'qa',
-	python_reviewer: 'qa',
-	typescript_reviewer: 'qa',
-	csharp_reviewer: 'qa',
-	flutter_reviewer: 'qa',
-	database_reviewer: 'qa',
-	healthcare_reviewer: 'qa',
-	gan_evaluator: 'qa',
-	opensource_sanitizer: 'qa',
-	pr_test_analyzer: 'qa',
-	silent_failure_hunter: 'qa',
-	type_design_analyzer: 'qa',
-
-	// ECC Pipeline agents (build resolvers, generators, and executors)
-	build_error_resolver: 'pipeline',
-	cpp_build_resolver: 'pipeline',
-	go_build_resolver: 'pipeline',
-	kotlin_build_resolver: 'pipeline',
-	java_build_resolver: 'pipeline',
-	rust_build_resolver: 'pipeline',
-	pytorch_build_resolver: 'pipeline',
-	dart_build_resolver: 'pipeline',
-	tdd_guide: 'pipeline',
-	e2e_runner: 'pipeline',
-	refactor_cleaner: 'pipeline',
-	performance_optimizer: 'pipeline',
-	gan_generator: 'pipeline',
-	opensource_forker: 'pipeline',
-	opensource_packager: 'pipeline',
-	code_simplifier: 'pipeline',
-
-	// ECC Support agents (planning, documentation, operations)
-	planner: 'support',
-	doc_updater: 'support',
-	docs_lookup: 'support',
-	harness_optimizer: 'support',
-	loop_operator: 'support',
-	chief_of_staff: 'support',
-	gan_planner: 'support',
-	code_architect: 'support',
-	code_explorer: 'support',
-	comment_analyzer: 'support',
-	conversation_analyzer: 'support',
-
-	// ECC Design Support agents (design-concerned support specialists)
-	a11y_architect: 'support',
-	seo_specialist: 'support',
 } as const;
 
 /**

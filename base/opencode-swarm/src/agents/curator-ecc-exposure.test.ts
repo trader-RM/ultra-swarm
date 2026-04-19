@@ -27,7 +27,7 @@ const CURATOR_PHASE_PROMPT = extractPromptBlock(
 	'CURATOR_PHASE_PROMPT',
 );
 
-const APPROVED_ECC_AGENTS = ['conversation_analyzer'];
+const APPROVED_ECC_AGENTS = ['conversation-analyzer'];
 
 describe('curator ECC Delegation Exposure', () => {
     it('lists only approved ECC agents in the ECC DELEGATION AND OVERSIGHT section for CURATOR_INIT', () => {
@@ -40,7 +40,7 @@ describe('curator ECC Delegation Exposure', () => {
         }
         
         // Verify the count matches
-        const countMatch = eccSection.match(/APPROVED ECC AGENTS \(delegation allowed\):\s*\n\n([\s\S]*?)(?=\n\nDELEGATION RULES)/);
+        const countMatch = eccSection.match(/APPROVED AGENTS \(delegation allowed\):\s*\n\n([\s\S]*?)(?=\n\nDELEGATION RULES)/);
         expect(countMatch).not.toBeNull();
         const agents = countMatch![1].split('\n').filter(line => line.trim().startsWith('- '));
         expect(agents.length).toBe(1); // count
@@ -62,7 +62,7 @@ describe('curator ECC Delegation Exposure', () => {
         }
         
         // Verify the count matches
-        const countMatch = eccSection.match(/APPROVED ECC AGENTS \(delegation allowed\):\s*\n\n([\s\S]*?)(?=\n\nDELEGATION RULES)/);
+        const countMatch = eccSection.match(/APPROVED AGENTS \(delegation allowed\):\s*\n\n([\s\S]*?)(?=\n\nDELEGATION RULES)/);
         expect(countMatch).not.toBeNull();
         const agents = countMatch![1].split('\n').filter(line => line.trim().startsWith('- '));
         expect(agents.length).toBe(1); // count
@@ -86,10 +86,10 @@ describe('curator ECC Delegation Exposure', () => {
     });
     
     it('explicitly states CAN delegate to approved ECC specialist agents for CURATOR_INIT', () => {
-        expect(CURATOR_INIT_PROMPT).toContain('you CAN delegate to approved ECC specialist agents');
+        expect(CURATOR_INIT_PROMPT).toContain('you CAN delegate to approved specialist agents');
     });
     
     it('explicitly states CAN delegate to approved ECC specialist agents for CURATOR_PHASE', () => {
-        expect(CURATOR_PHASE_PROMPT).toContain('you CAN delegate to approved ECC specialist agents');
+        expect(CURATOR_PHASE_PROMPT).toContain('you CAN delegate to approved specialist agents');
     });
 });

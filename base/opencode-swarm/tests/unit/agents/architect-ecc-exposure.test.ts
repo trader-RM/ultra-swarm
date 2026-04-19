@@ -2,153 +2,153 @@ import { describe, expect, it } from 'bun:test';
 import { ARCHITECT_PROMPT } from '../../../src/agents/architect';
 
 describe('Architect prompt ECC agent exposure', () => {
-	it('includes code_architect in AGENTS section', () => {
-		expect(ARCHITECT_PROMPT).toContain('code_architect');
-		expect(ARCHITECT_PROMPT).toContain('code_architect - Designs');
+	it('includes code-architect in AGENTS section', () => {
+		expect(ARCHITECT_PROMPT).toContain('code-architect');
+		expect(ARCHITECT_PROMPT).toContain('code-architect - Designs');
 	});
 
-	it('includes code_architect in Your agents line', () => {
-		expect(ARCHITECT_PROMPT).toContain('{{AGENT_PREFIX}}code_architect');
+	it('includes code-architect in Your agents line', () => {
+		expect(ARCHITECT_PROMPT).toContain('{{AGENT_PREFIX}}code-architect');
 	});
 
-	it('excludes chief_of_staff Support agent', () => {
-		expect(ARCHITECT_PROMPT).not.toContain('chief_of_staff');
+	it('excludes chief-of-staff Support agent', () => {
+		expect(ARCHITECT_PROMPT).not.toContain('chief-of-staff');
 	});
 
 	it('excludes planner Support agent', () => {
 		expect(ARCHITECT_PROMPT).not.toContain('planner');
 	});
 
-	it('excludes gan_planner Support agent', () => {
-		expect(ARCHITECT_PROMPT).not.toContain('gan_planner');
+	it('excludes gan-planner Support agent', () => {
+		expect(ARCHITECT_PROMPT).not.toContain('gan-planner');
 	});
 
-	it('excludes doc_updater Support agent', () => {
-		expect(ARCHITECT_PROMPT).not.toContain('doc_updater');
+	it('excludes doc-updater Support agent', () => {
+		expect(ARCHITECT_PROMPT).not.toContain('doc-updater');
 	});
 
-	it('excludes docs_lookup Support agent', () => {
-		expect(ARCHITECT_PROMPT).not.toContain('docs_lookup');
+	it('excludes docs-lookup Support agent', () => {
+		expect(ARCHITECT_PROMPT).not.toContain('docs-lookup');
 	});
 
-	it('excludes code_reviewer ECC agent', () => {
-		expect(ARCHITECT_PROMPT).not.toContain('code_reviewer');
+	it('excludes code-reviewer ECC agent', () => {
+		expect(ARCHITECT_PROMPT).not.toContain('code-reviewer');
 	});
 
-	it('excludes security_reviewer ECC agent', () => {
-		expect(ARCHITECT_PROMPT).not.toContain('security_reviewer');
+	it('excludes security-reviewer ECC agent', () => {
+		expect(ARCHITECT_PROMPT).not.toContain('security-reviewer');
 	});
 
-	it('excludes cpp_reviewer ECC agent', () => {
-		expect(ARCHITECT_PROMPT).not.toContain('cpp_reviewer');
+	it('excludes cpp-reviewer ECC agent', () => {
+		expect(ARCHITECT_PROMPT).not.toContain('cpp-reviewer');
 	});
 
-	it('excludes go_reviewer ECC agent', () => {
-		expect(ARCHITECT_PROMPT).not.toContain('go_reviewer');
+	it('excludes go-reviewer ECC agent', () => {
+		expect(ARCHITECT_PROMPT).not.toContain('go-reviewer');
 	});
 
-	it('excludes kotlin_reviewer ECC agent', () => {
-		expect(ARCHITECT_PROMPT).not.toContain('kotlin_reviewer');
+	it('excludes kotlin-reviewer ECC agent', () => {
+		expect(ARCHITECT_PROMPT).not.toContain('kotlin-reviewer');
 	});
 
-	it('excludes java_reviewer ECC agent', () => {
-		expect(ARCHITECT_PROMPT).not.toContain('java_reviewer');
+	it('excludes java-reviewer ECC agent', () => {
+		expect(ARCHITECT_PROMPT).not.toContain('java-reviewer');
 	});
 
-	it('excludes rust_reviewer ECC agent', () => {
-		expect(ARCHITECT_PROMPT).not.toContain('rust_reviewer');
+	it('excludes rust-reviewer ECC agent', () => {
+		expect(ARCHITECT_PROMPT).not.toContain('rust-reviewer');
 	});
 
-	it('excludes python_reviewer ECC agent', () => {
-		expect(ARCHITECT_PROMPT).not.toContain('python_reviewer');
+	it('excludes python-reviewer ECC agent', () => {
+		expect(ARCHITECT_PROMPT).not.toContain('python-reviewer');
 	});
 
-	it('excludes typescript_reviewer ECC agent', () => {
-		expect(ARCHITECT_PROMPT).not.toContain('typescript_reviewer');
+	it('excludes typescript-reviewer ECC agent', () => {
+		expect(ARCHITECT_PROMPT).not.toContain('typescript-reviewer');
 	});
 
-	it('excludes csharp_reviewer ECC agent', () => {
-		expect(ARCHITECT_PROMPT).not.toContain('csharp_reviewer');
+	it('excludes csharp-reviewer ECC agent', () => {
+		expect(ARCHITECT_PROMPT).not.toContain('csharp-reviewer');
 	});
 
-	it('excludes flutter_reviewer ECC agent', () => {
-		expect(ARCHITECT_PROMPT).not.toContain('flutter_reviewer');
+	it('excludes flutter-reviewer ECC agent', () => {
+		expect(ARCHITECT_PROMPT).not.toContain('flutter-reviewer');
 	});
 
-	it('excludes database_reviewer ECC agent', () => {
-		expect(ARCHITECT_PROMPT).not.toContain('database_reviewer');
+	it('excludes database-reviewer ECC agent', () => {
+		expect(ARCHITECT_PROMPT).not.toContain('database-reviewer');
 	});
 
-	it('excludes healthcare_reviewer ECC agent', () => {
-		expect(ARCHITECT_PROMPT).not.toContain('healthcare_reviewer');
+	it('excludes healthcare-reviewer ECC agent', () => {
+		expect(ARCHITECT_PROMPT).not.toContain('healthcare-reviewer');
 	});
 
-	it('excludes gan_evaluator ECC agent', () => {
-		expect(ARCHITECT_PROMPT).not.toContain('gan_evaluator');
+	it('excludes gan-evaluator ECC agent', () => {
+		expect(ARCHITECT_PROMPT).not.toContain('gan-evaluator');
 	});
 
-	it('excludes opensource_sanitizer ECC agent', () => {
-		expect(ARCHITECT_PROMPT).not.toContain('opensource_sanitizer');
+	it('excludes opensource-sanitizer ECC agent', () => {
+		expect(ARCHITECT_PROMPT).not.toContain('opensource-sanitizer');
 	});
 
-	it('excludes build_error_resolver ECC agent', () => {
-		expect(ARCHITECT_PROMPT).not.toContain('build_error_resolver');
+	it('excludes build-error-resolver ECC agent', () => {
+		expect(ARCHITECT_PROMPT).not.toContain('build-error-resolver');
 	});
 
-	it('excludes cpp_build_resolver ECC agent', () => {
-		expect(ARCHITECT_PROMPT).not.toContain('cpp_build_resolver');
+	it('excludes cpp-build-resolver ECC agent', () => {
+		expect(ARCHITECT_PROMPT).not.toContain('cpp-build-resolver');
 	});
 
-	it('excludes go_build_resolver ECC agent', () => {
-		expect(ARCHITECT_PROMPT).not.toContain('go_build_resolver');
+	it('excludes go-build-resolver ECC agent', () => {
+		expect(ARCHITECT_PROMPT).not.toContain('go-build-resolver');
 	});
 
-	it('excludes kotlin_build_resolver ECC agent', () => {
-		expect(ARCHITECT_PROMPT).not.toContain('kotlin_build_resolver');
+	it('excludes kotlin-build-resolver ECC agent', () => {
+		expect(ARCHITECT_PROMPT).not.toContain('kotlin-build-resolver');
 	});
 
-	it('excludes java_build_resolver ECC agent', () => {
-		expect(ARCHITECT_PROMPT).not.toContain('java_build_resolver');
+	it('excludes java-build-resolver ECC agent', () => {
+		expect(ARCHITECT_PROMPT).not.toContain('java-build-resolver');
 	});
 
-	it('excludes rust_build_resolver ECC agent', () => {
-		expect(ARCHITECT_PROMPT).not.toContain('rust_build_resolver');
+	it('excludes rust-build-resolver ECC agent', () => {
+		expect(ARCHITECT_PROMPT).not.toContain('rust-build-resolver');
 	});
 
-	it('excludes pytorch_build_resolver ECC agent', () => {
-		expect(ARCHITECT_PROMPT).not.toContain('pytorch_build_resolver');
+	it('excludes pytorch-build-resolver ECC agent', () => {
+		expect(ARCHITECT_PROMPT).not.toContain('pytorch-build-resolver');
 	});
 
-	it('excludes dart_build_resolver ECC agent', () => {
-		expect(ARCHITECT_PROMPT).not.toContain('dart_build_resolver');
+	it('excludes dart-build-resolver ECC agent', () => {
+		expect(ARCHITECT_PROMPT).not.toContain('dart-build-resolver');
 	});
 
-	it('excludes tdd_guide ECC agent', () => {
-		expect(ARCHITECT_PROMPT).not.toContain('tdd_guide');
+	it('excludes tdd-guide ECC agent', () => {
+		expect(ARCHITECT_PROMPT).not.toContain('tdd-guide');
 	});
 
-	it('excludes e2e_runner ECC agent', () => {
-		expect(ARCHITECT_PROMPT).not.toContain('e2e_runner');
+	it('excludes e2e-runner ECC agent', () => {
+		expect(ARCHITECT_PROMPT).not.toContain('e2e-runner');
 	});
 
-	it('excludes refactor_cleaner ECC agent', () => {
-		expect(ARCHITECT_PROMPT).not.toContain('refactor_cleaner');
+	it('excludes refactor-cleaner ECC agent', () => {
+		expect(ARCHITECT_PROMPT).not.toContain('refactor-cleaner');
 	});
 
-	it('excludes performance_optimizer ECC agent', () => {
-		expect(ARCHITECT_PROMPT).not.toContain('performance_optimizer');
+	it('excludes performance-optimizer ECC agent', () => {
+		expect(ARCHITECT_PROMPT).not.toContain('performance-optimizer');
 	});
 
-	it('excludes gan_generator ECC agent', () => {
-		expect(ARCHITECT_PROMPT).not.toContain('gan_generator');
+	it('excludes gan-generator ECC agent', () => {
+		expect(ARCHITECT_PROMPT).not.toContain('gan-generator');
 	});
 
-	it('excludes opensource_forker ECC agent', () => {
-		expect(ARCHITECT_PROMPT).not.toContain('opensource_forker');
+	it('excludes opensource-forker ECC agent', () => {
+		expect(ARCHITECT_PROMPT).not.toContain('opensource-forker');
 	});
 
-	it('excludes opensource_packager ECC agent', () => {
-		expect(ARCHITECT_PROMPT).not.toContain('opensource_packager');
+	it('excludes opensource-packager ECC agent', () => {
+		expect(ARCHITECT_PROMPT).not.toContain('opensource-packager');
 	});
 
 	it('includes explorer native agent', () => {

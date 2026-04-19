@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { createTestEngineerAgent } from './test-engineer';
 
-const APPROVED_ECC_AGENTS = ['e2e_runner', 'tdd_guide', 'pr_test_analyzer'];
+const APPROVED_ECC_AGENTS = ['e2e-runner', 'tdd-guide', 'pr-test-analyzer'];
 
 describe('test-engineer ECC Delegation Exposure', () => {
     it('lists only approved ECC agents in the ECC DELEGATION AND OVERSIGHT section', () => {
@@ -17,7 +17,7 @@ describe('test-engineer ECC Delegation Exposure', () => {
         }
         
         // Verify the count matches
-        const countMatch = eccSection.match(/APPROVED ECC AGENTS \(delegation allowed\):\s*\n\n([\s\S]*?)(?=\n\nDELEGATION RULES)/);
+        const countMatch = eccSection.match(/APPROVED AGENTS \(delegation allowed\):\s*\n\n([\s\S]*?)(?=\n\nDELEGATION RULES)/);
         expect(countMatch).not.toBeNull();
         const agents = countMatch![1].split('\n').filter(line => line.trim().startsWith('- '));
         expect(agents.length).toBe(3); // count
@@ -42,6 +42,6 @@ describe('test-engineer ECC Delegation Exposure', () => {
     it('explicitly states CAN delegate to approved ECC specialist test agents', () => {
         const agent = createTestEngineerAgent('gpt-4');
         const prompt = agent.config.prompt!;
-        expect(prompt).toContain('you CAN delegate to approved ECC specialist test agents');
+        expect(prompt).toContain('you CAN delegate to approved specialist test agents');
     });
 });

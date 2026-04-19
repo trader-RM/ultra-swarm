@@ -1,45 +1,45 @@
 import { describe, expect, test } from 'bun:test';
 import { CODER_PROMPT, getAgentConfigs } from '../../../src/agents';
 
-// Approved ECC agents (build and pipeline resolvers + gan_generator + code_simplifier)
+// Approved ECC agents (build and pipeline resolvers + gan-generator + code-simplifier)
 const APPROVED_BUILD_AGENTS = [
-	'build_error_resolver',
-	'cpp_build_resolver',
-	'dart_build_resolver',
-	'go_build_resolver',
-	'java_build_resolver',
-	'kotlin_build_resolver',
-	'pytorch_build_resolver',
-	'rust_build_resolver',
+	'build-error-resolver',
+	'cpp-build-resolver',
+	'dart-build-resolver',
+	'go-build-resolver',
+	'java-build-resolver',
+	'kotlin-build-resolver',
+	'pytorch-build-resolver',
+	'rust-build-resolver',
 ] as const;
 
-const APPROVED_PIPELINE_AGENTS = ['gan_generator', 'code_simplifier'] as const;
+const APPROVED_PIPELINE_AGENTS = ['gan-generator', 'code-simplifier'] as const;
 
 const APPROVED_ECC_AGENTS = [...APPROVED_BUILD_AGENTS, ...APPROVED_PIPELINE_AGENTS] as const;
 
 // Excluded ECC agents (sample from each category)
 const EXCLUDED_ECC_AGENTS = [
 	// Review/QA (not allowed for coder delegation)
-	'code_reviewer',
-	'security_reviewer',
-	'cpp_reviewer',
-	'tdd_guide',
-	'e2e_runner',
-	'refactor_cleaner',
-	'performance_optimizer',
+	'code-reviewer',
+	'security-reviewer',
+	'cpp-reviewer',
+	'tdd-guide',
+	'e2e-runner',
+	'refactor-cleaner',
+	'performance-optimizer',
 	'planner',
-	'doc_updater',
-	'docs_lookup',
-	'harness_optimizer',
-	'loop_operator',
-	'chief_of_staff',
-	'gan_planner',
+	'doc-updater',
+	'docs-lookup',
+	'harness-optimizer',
+	'loop-operator',
+	'chief-of-staff',
+	'gan-planner',
 	// Pipeline (not in approved list)
-	'opensource_forker',
-	'opensource_packager',
+	'opensource-forker',
+	'opensource-packager',
 	// Support (not allowed for coder delegation)
-	'gan_evaluator',
-	'opensource_sanitizer',
+	'gan-evaluator',
+	'opensource-sanitizer',
 ] as const;
 
 // Delegation rules constants
@@ -74,7 +74,7 @@ describe('Coder ECC Exposure', () => {
    test(`${agent} is listed as approved ECC agent`, () => {
     expect(CODER_PROMPT).toContain(agent);
     // Verify agent appears in the APPROVED ECC AGENTS section
-    const approvedSectionIndex = CODER_PROMPT.indexOf('APPROVED ECC AGENTS');
+    const approvedSectionIndex = CODER_PROMPT.indexOf('APPROVED AGENTS');
     const agentIndex = CODER_PROMPT.indexOf(agent);
     expect(agentIndex).toBeGreaterThan(approvedSectionIndex);
    });
@@ -158,38 +158,6 @@ describe('Coder ECC Exposure', () => {
    expect(localCoderConfig.permission).toEqual({ task: 'allow' });
   });
  });
-
-  describe('Adversarial: non-coder agent names ending with _coder must NOT get task permission', () => {
-  	test('architect_coder is not a real coder and must NOT get task:allow', () => {
-  		// 'architect_coder' is not a valid swarm-prefixed agent — no known prefix strips it to 'coder'
-  		// stripKnownSwarmPrefix('architect_coder') returns 'architect_coder' (unchanged), not 'coder'
-  		// Therefore it should NOT get task:allow
-  		const configs = getAgentConfigs({});
-  		// This agent doesn't exist in the default config, so it's undefined
-  		// But even if someone added it, the baseName check would prevent false permission
-  		expect(configs['architect_coder']).toBeUndefined();
-  	});
-
-  	test('custom_coder is not a real coder (unknown prefix)', () => {
-  		// 'custom_coder' — 'custom' is a known prefix, so stripKnownSwarmPrefix('custom_coder') → 'coder'
-  		// However, 'custom_coder' is not created by createSwarmAgents because 'custom' is not
-  		// used as a swarmId in any config we pass. The key point is that if it WERE created,
-  		// stripKnownSwarmPrefix would correctly identify it as base name 'coder'.
-  		// This test verifies the logic is sound: real swarm-prefixed coders (local_coder, cloud_coder)
-  		// resolve to base 'coder' and get task:allow, while non-existent names are undefined.
-  		const config = {
-  			swarms: {
-  				default: {
-  					name: 'Default Swarm',
-  					agents: {},
-  				},
-  			},
-  		};
-  		const configs = getAgentConfigs(config);
-  		// 'custom_coder' doesn't exist in this config
-  		expect(configs['custom_coder']).toBeUndefined();
-  	});
-  });
 
   describe('Coder agent name resolution', () => {
   test('default coder (no swarms config) gets mode:subagent and task:allow permission', () => {

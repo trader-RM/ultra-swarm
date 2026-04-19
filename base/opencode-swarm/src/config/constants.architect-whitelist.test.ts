@@ -134,10 +134,7 @@ describe('AGENT_TOOL_MAP.architect whitelist verification', () => {
 		});
 
 		it('each role should have at least one tool', () => {
-			// type_design_analyzer is intentionally empty — native-tools-only ECC agent
-			const INTENTIONALLY_EMPTY: string[] = ['type_design_analyzer'];
 			Object.entries(AGENT_TOOL_MAP).forEach(([role, tools]) => {
-				if (INTENTIONALLY_EMPTY.includes(role)) return;
 				expect(tools.length).toBeGreaterThan(0);
 			});
 		});

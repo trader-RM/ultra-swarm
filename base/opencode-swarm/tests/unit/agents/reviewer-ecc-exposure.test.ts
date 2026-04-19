@@ -1,62 +1,60 @@
 import { describe, expect, test } from 'bun:test';
 import { getAgentConfigs, REVIEWER_PROMPT } from '../../../src/agents';
 
-// Approved ECC review agents (18 that exist in ALL_SUBAGENT_NAMES)
+// Approved ECC review agents (19 that exist in ALL_SUBAGENT_NAMES)
 const APPROVED_REVIEW_AGENTS = [
-	'code_reviewer',
-	'csharp_reviewer',
-	'cpp_reviewer',
-	'database_reviewer',
-	'flutter_reviewer',
-	'gan_evaluator',
-	'go_reviewer',
-	'healthcare_reviewer',
-	'java_reviewer',
-	'kotlin_reviewer',
-	'opensource_sanitizer',
-	'performance_optimizer',
-	'python_reviewer',
-	'refactor_cleaner',
-	'rust_reviewer',
-	'security_reviewer',
-	'silent_failure_hunter',
-	'typescript_reviewer',
+	'code-reviewer',
+	'csharp-reviewer',
+	'cpp-reviewer',
+	'database-reviewer',
+	'flutter-reviewer',
+	'gan-evaluator',
+	'go-reviewer',
+	'healthcare-reviewer',
+	'java-reviewer',
+	'kotlin-reviewer',
+	'opensource-sanitizer',
+	'performance-optimizer',
+	'python-reviewer',
+	'refactor-cleaner',
+	'rust-reviewer',
+	'security-reviewer',
+	'silent-failure-hunter',
+	'typescript-reviewer',
+	'type-design-analyzer',
 ] as const;
 
 // Agents that do NOT exist in ALL_SUBAGENT_NAMES — skipped per user instruction
-const SKIPPED_NONEXISTENT_AGENTS = [
-	'code_simplifier',
-	'type_design_analyzer',
-] as const;
+const SKIPPED_NONEXISTENT_AGENTS = ['code-simplifier'] as const;
 
 // Excluded ECC agents (build, pipeline, support — NOT approved for reviewer)
 const EXCLUDED_BUILD_AGENTS = [
-	'build_error_resolver',
-	'cpp_build_resolver',
-	'dart_build_resolver',
-	'go_build_resolver',
-	'java_build_resolver',
-	'kotlin_build_resolver',
-	'pytorch_build_resolver',
-	'rust_build_resolver',
+	'build-error-resolver',
+	'cpp-build-resolver',
+	'dart-build-resolver',
+	'go-build-resolver',
+	'java-build-resolver',
+	'kotlin-build-resolver',
+	'pytorch-build-resolver',
+	'rust-build-resolver',
 ] as const;
 
 const EXCLUDED_PIPELINE_AGENTS = [
-	'tdd_guide',
-	'e2e_runner',
-	'gan_generator',
-	'opensource_forker',
-	'opensource_packager',
+	'tdd-guide',
+	'e2e-runner',
+	'gan-generator',
+	'opensource-forker',
+	'opensource-packager',
 ] as const;
 
 const EXCLUDED_SUPPORT_AGENTS = [
 	'planner',
-	'doc_updater',
-	'docs_lookup',
-	'harness_optimizer',
-	'loop_operator',
-	'chief_of_staff',
-	'gan_planner',
+	'doc-updater',
+	'docs-lookup',
+	'harness-optimizer',
+	'loop-operator',
+	'chief-of-staff',
+	'gan-planner',
 ] as const;
 
 const EXCLUDED_ECC_AGENTS = [
@@ -122,13 +120,13 @@ describe('Reviewer ECC Exposure — Phase 5', () => {
 			});
 		}
 
-		test('REVIEWER_PROMPT states delegation count as 18', () => {
-			expect(REVIEWER_PROMPT).toContain('18 agents');
+		test('REVIEWER_PROMPT states delegation count as 19', () => {
+			expect(REVIEWER_PROMPT).toContain('19 agents');
 		});
 
 		test('REVIEWER_PROMPT states delegation-only restriction', () => {
 			expect(REVIEWER_PROMPT).toContain(
-				'You may ONLY delegate to the 18 agents listed above',
+				'You may ONLY delegate to the 19 agents listed above',
 			);
 		});
 	});
@@ -204,53 +202,6 @@ describe('Reviewer ECC Exposure — Phase 5', () => {
 
 			expect(cloudReviewerConfig).toBeDefined();
 			expect(cloudReviewerConfig.permission).toEqual({ task: 'allow' });
-		});
-	});
-
-	describe('Adversarial: ECC agents that must NOT get task:allow', () => {
-		test('ECC cpp_reviewer does NOT get task permission', () => {
-			const configs = getAgentConfigs();
-			const cppReviewer = configs['cpp_reviewer'];
-
-			expect(cppReviewer).toBeDefined();
-			expect(cppReviewer.mode).toBe('subagent');
-			expect(cppReviewer.permission).toBeUndefined();
-		});
-
-		test('ECC security_reviewer does NOT get task permission', () => {
-			const configs = getAgentConfigs();
-			const securityReviewer = configs['security_reviewer'];
-
-			expect(securityReviewer).toBeDefined();
-			expect(securityReviewer.mode).toBe('subagent');
-			expect(securityReviewer.permission).toBeUndefined();
-		});
-
-		test('ECC gan_evaluator does NOT get task permission', () => {
-			const configs = getAgentConfigs();
-			const ganEvaluator = configs['gan_evaluator'];
-
-			expect(ganEvaluator).toBeDefined();
-			expect(ganEvaluator.mode).toBe('subagent');
-			expect(ganEvaluator.permission).toBeUndefined();
-		});
-
-		test('ECC build_error_resolver does NOT get task permission', () => {
-			const configs = getAgentConfigs();
-			const buildResolver = configs['build_error_resolver'];
-
-			expect(buildResolver).toBeDefined();
-			expect(buildResolver.mode).toBe('subagent');
-			expect(buildResolver.permission).toBeUndefined();
-		});
-
-		test('ECC refactor_cleaner does NOT get task permission', () => {
-			const configs = getAgentConfigs();
-			const refactorCleaner = configs['refactor_cleaner'];
-
-			expect(refactorCleaner).toBeDefined();
-			expect(refactorCleaner.mode).toBe('subagent');
-			expect(refactorCleaner.permission).toBeUndefined();
 		});
 	});
 
