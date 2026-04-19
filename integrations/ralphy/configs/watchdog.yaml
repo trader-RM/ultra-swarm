@@ -12,6 +12,9 @@ commands:
   lint: ""
   build: ""
 
+# NOTE: These rules are advisory. Ralphy does not technically enforce them at runtime.
+# For guaranteed read-only operation, use watchdog-watch.ps1 (PowerShell staleness monitor).
+# Direct Ralphy execution via ralphy.sh --opencode WILL modify files regardless of this config.
 rules:
   - "NEVER write to .swarm/ directory — read only"
   - "NEVER delegate to coder, reviewer, or test_engineer agents"

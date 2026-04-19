@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Informational only — this script does NOT start a watchdog process.
 # Ultra Swarm Watchdog — Ralphy-based loop
 # Uses Ralphy's PRD mode to drive tasks, but with STRICT read-only boundaries.
 # For Windows, use watchdog-watch.ps1 instead.

@@ -38,6 +38,7 @@ function Send-ToastAlert {
         $balloon.Visible = $True
         $balloon.ShowBalloonTip(10000)
         Start-Sleep -Seconds 2
+        $balloon.Visible = $False
         $balloon.Dispose()
     }
     catch {
@@ -76,7 +77,7 @@ while ($true) {
     $newestFile = Get-NewestEvidenceFile
     $contextTime = Get-ContextModTime
 
-# Calculate staleness from evidence files only
+    # Calculate staleness from evidence files only
     # context.md updates independently (plan writes) and shouldn't trigger false alerts
     $evidenceAgeMinutes = if ($newestFile) {
         [math]::Floor(($now - $newestFile.LastWriteTime).TotalMinutes)

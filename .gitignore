@@ -1,6 +1,13 @@
 # Swarm internal state
 .swarm/
 
+# Swarm session artifacts (generated during swarm runs, not source)
+SWARM_PLAN.json
+SWARM_PLAN.md
+IMPLEMENTATION_APPROACH.md
+*.bak
+.tours/
+
 # OS files
 .DS_Store
 Thumbs.db

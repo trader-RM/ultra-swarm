@@ -3,24 +3,27 @@ import { describe, it, expect } from "bun:test";
 // Inline the function to test since we can't import from plugin.patch.ts
 function isAgentInstruction(text: string): boolean {
   if (!text || text.trim().length === 0) return false;
-  // Exclude the plugin's own skill evaluation injections
   if (text.includes("<skill-evaluation-required>")) return false;
   if (text.includes("<available-skills>")) return false;
-  // Agent delegation instructions contain structured delegation context
-  // (task specs, agent names, delegation envelopes, constraints)
-  const hasDelegationSignal =
-    text.includes("[agent]") ||
-    text.includes("TASK:") ||
-    text.includes("delegation") ||
-    text.includes("CONSTRAINT:") ||
-    text.includes("ACCEPTANCE:") ||
-    text.includes("FILE:") ||
-    text.includes("architect") ||
-    text.includes("reviewer") ||
-    text.includes("test_engineer") ||
-    text.includes("explorer") ||
-    text.includes("coder");
-  return hasDelegationSignal;
+  // Structured delegation markers must appear at column 0 (no leading whitespace).
+  // This prevents false-positive matches in indented code blocks, prose, or examples.
+  // All signals are case-sensitive. Lowercase "task:" will not match.
+  const lines = text.split('\n');
+  for (const line of lines) {
+    if (
+      line.startsWith("[agent]") ||
+      line.startsWith("TASK:") ||
+      line.startsWith("CONSTRAINT:") ||
+      line.startsWith("ACCEPTANCE:") ||
+      line.startsWith("FILE:") ||
+      line.startsWith("INPUT:") ||
+      line.startsWith("OUTPUT:") ||
+      line.startsWith("DESCRIPTION:")
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 describe("isAgentInstruction", () => {
@@ -67,7 +70,7 @@ describe("isAgentInstruction", () => {
   it("should return true for text containing [agent]", () => {
     expect(
       isAgentInstruction(
-        "Please [agent] analyze this code and provide feedback"
+        "[agent] analyze this code and provide feedback"
       )
     ).toBe(true);
   });
@@ -80,12 +83,12 @@ describe("isAgentInstruction", () => {
     ).toBe(true);
   });
 
-  it("should return true for text containing delegation", () => {
+  it("should return false for prose containing 'delegation' (not a structured signal in current impl)", () => {
     expect(
       isAgentInstruction(
         "I'm requesting delegation to the security expert for this sensitive operation"
       )
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("should return true for text containing CONSTRAINT:", () => {
@@ -112,44 +115,56 @@ describe("isAgentInstruction", () => {
     ).toBe(true);
   });
 
-  it("should return true for text containing architect", () => {
+  it("should return true for INPUT: at column 0", () => {
+    expect(isAgentInstruction("INPUT: user data payload")).toBe(true);
+  });
+
+  it("should return true for OUTPUT: at column 0", () => {
+    expect(isAgentInstruction("OUTPUT: modified file")).toBe(true);
+  });
+
+  it("should return true for DESCRIPTION: at column 0", () => {
+    expect(isAgentInstruction("DESCRIPTION: task description text")).toBe(true);
+  });
+
+  it("should return false for agent name 'architect' in prose (loose substring matching removed)", () => {
     expect(
       isAgentInstruction(
         "Please consult the architect for the system design approach"
       )
-    ).toBe(true);
+    ).toBe(false);
   });
 
-  it("should return true for text containing reviewer", () => {
+  it("should return false for agent name 'reviewer' in prose (loose substring matching removed)", () => {
     expect(
       isAgentInstruction(
         "The reviewer should check this code change before merging"
       )
-    ).toBe(true);
+    ).toBe(false);
   });
 
-  it("should return true for text containing test_engineer", () => {
+  it("should return false for agent name 'test_engineer' in prose (loose substring matching removed)", () => {
     expect(
       isAgentInstruction(
         "The test_engineer needs to create unit tests for this module"
       )
-    ).toBe(true);
+    ).toBe(false);
   });
 
-  it("should return true for text containing explorer", () => {
+  it("should return false for agent name 'explorer' in prose (loose substring matching removed)", () => {
     expect(
       isAgentInstruction(
         "The explorer agent can investigate the API documentation"
       )
-    ).toBe(true);
+    ).toBe(false);
   });
 
-  it("should return true for text containing coder", () => {
+  it("should return false for agent name 'coder' in prose (loose substring matching removed)", () => {
     expect(
       isAgentInstruction(
         "The coder should implement the feature according to specifications"
       )
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("should return false when delegation signal AND <skill-evaluation-required> are in same text", () => {
@@ -169,49 +184,49 @@ describe("isAgentInstruction", () => {
       fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in 
       culpa qui officia deserunt mollit anim id est laborum.
       
-      TASK: Implement the user authentication feature with JWT tokens
+TASK: Implement the user authentication feature with JWT tokens
     `;
     expect(isAgentInstruction(longText)).toBe(true);
   });
 
-  it("should return true for text with partial keyword match (includes is substring matching)", () => {
-    // Testing that "architecture" includes "architect" so it will match
+  it("should return false for 'architecture' (substring of 'architect' no longer matches in current impl)", () => {
+    // "architecture" no longer matches — loose substring matching removed, strict column-0 prefix required
     expect(
       isAgentInstruction(
         "We need to consider the architecture of this solution"
       )
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("should correctly distinguish between coder and coding", () => {
-    // "coding" contains "cod" but not "coder" so should return false
+    // "coding" does not contain "coder" (different suffix), so returns false
     expect(isAgentInstruction("I enjoy coding in TypeScript")).toBe(false);
     
-    // "coder" should return true
+    // "coder" should return false (prose, not at column 0)
     expect(
       isAgentInstruction(
         "The coder should refactor this component"
       )
-    ).toBe(true);
+    ).toBe(false);
   });
 
   describe("Adversarial", () => {
-    it("should return true for near-match tags like <skill-eval-required> (feedback loop bypass)", () => {
-      // Should return true because <skill-eval-required> is not the exact excluded tag
+    it("should return false for TASK: not at column 0, even with near-miss tag", () => {
+      // Returns false because TASK: is not at column 0 (line starts with "<")
       expect(
         isAgentInstruction(
           "<skill-eval-required> TASK: implement feature"
         )
-      ).toBe(true);
+      ).toBe(false);
     });
 
-    it("should return true for slightly different tag <skill-evaluation-needed> (feedback loop bypass)", () => {
-      // Should return true because <skill-evaluation-needed> is not the exact excluded tag
+    it("should return false for agent name in prose even without exclusion tag", () => {
+      // Returns false because agent names in prose no longer match as signals
       expect(
         isAgentInstruction(
           "<skill-evaluation-needed> architect review"
         )
-      ).toBe(true);
+      ).toBe(false);
     });
 
     it("should return false for exact match <skill-evaluation-required> (feedback loop safeguard)", () => {
@@ -230,23 +245,22 @@ describe("isAgentInstruction", () => {
       ).toBe(true);
     });
 
-    it("should return true for very long string (10k+ chars) with delegation keyword at the end", () => {
-      // Should still match even with very long text
+    it("should return false for TASK: not at column 0 in very long single-line string", () => {
+      // Returns false because TASK: is not at column 0 in this very long single-line string
       const longText = "A".repeat(10000) + " TASK: implement feature";
-      expect(isAgentInstruction(longText)).toBe(true);
+      expect(isAgentInstruction(longText)).toBe(false);
     });
 
-    it("should return true for string with only delegation keywords and no other content", () => {
-      // Should match with just "architect" alone
-      expect(isAgentInstruction("architect")).toBe(true);
+    it("should return true for TASK: at column 0 with no other content", () => {
+      // Returns true because TASK: is at column 0
+      expect(isAgentInstruction("TASK: implement")).toBe(true);
     });
 
-    it("should return true for architectural (known behavior - loose matching)", () => {
-      // Known behavior: "architectural" includes "architect" so returns true
-      // Documented as NOT a bug - function is designed with loose matching
+    it("should return false for 'architectural' (loose matching removed — strict column-0 prefix required)", () => {
+      // Returns false — loose matching removed, strict column-0 prefix required
       expect(
         isAgentInstruction("Review the architectural decisions")
-      ).toBe(true);
+      ).toBe(false);
     });
 
     it("should return false for coding (does NOT contain exact 'coder' match)", () => {
