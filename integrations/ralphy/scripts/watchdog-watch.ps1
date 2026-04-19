@@ -27,7 +27,8 @@ function Write-Status {
 function Send-ToastAlert {
     param([string]$Title, [string]$Message)
     try {
-        # Windows toast notification via PowerShell
+        # Windows balloon tip notification (WinForms NotifyIcon)
+        # This is the most reliable cross-Windows notification without extra dependencies
         [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") | Out-Null
         $balloon = New-Object System.Windows.Forms.NotifyIcon
         $balloon.Icon = [System.Drawing.SystemIcons]::Warning
@@ -40,8 +41,8 @@ function Send-ToastAlert {
         $balloon.Dispose()
     }
     catch {
-        # Fallback: just console output
-        Write-Host "  (toast notification unavailable)" -ForegroundColor DarkGray
+        # Fallback: console-only notification
+        Write-Host "  (notification unavailable - check console)" -ForegroundColor DarkGray
     }
 }
 
@@ -75,20 +76,22 @@ while ($true) {
     $newestFile = Get-NewestEvidenceFile
     $contextTime = Get-ContextModTime
 
-    # Calculate staleness
+# Calculate staleness from evidence files only
+    # context.md updates independently (plan writes) and shouldn't trigger false alerts
     $evidenceAgeMinutes = if ($newestFile) {
         [math]::Floor(($now - $newestFile.LastWriteTime).TotalMinutes)
     } else {
         999  # No evidence files = very stale
     }
 
+    # Track context age separately for info display only (not used in alerting)
     $contextAgeMinutes = if ($contextTime) {
         [math]::Floor(($now - $contextTime).TotalMinutes)
     } else {
-        999
+        0
     }
 
-    $maxAge = [math]::Max($evidenceAgeMinutes, $contextAgeMinutes)
+    $maxAge = $evidenceAgeMinutes  # Alert based on evidence only
     $running = [math]::Floor(($now - $WatchdogStart).TotalMinutes)
 
     # Status line

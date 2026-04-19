@@ -41,6 +41,7 @@ function getLoadedSkills(sessionID: string): Set<string> {
 
 /**
  * Identify synthetic parts that contain agent-to-agent instruction text.
+ * Uses strict prefix matching to avoid false positives from loose keyword matching.
  * Excludes the plugin's own <skill-evaluation-required> injections to prevent
  * feedback loops (re-matching our own matched skills would be circular).
  */
@@ -49,21 +50,25 @@ function isAgentInstruction(text: string): boolean {
   // Exclude the plugin's own skill evaluation injections
   if (text.includes("<skill-evaluation-required>")) return false;
   if (text.includes("<available-skills>")) return false;
-  // Agent delegation instructions contain structured delegation context
-  // (task specs, agent names, delegation envelopes, constraints)
-  const hasDelegationSignal =
-    text.includes("[agent]") ||
-    text.includes("TASK:") ||
-    text.includes("delegation") ||
-    text.includes("CONSTRAINT:") ||
-    text.includes("ACCEPTANCE:") ||
-    text.includes("FILE:") ||
-    text.includes("architect") ||
-    text.includes("reviewer") ||
-    text.includes("test_engineer") ||
-    text.includes("explorer") ||
-    text.includes("coder");
-  return hasDelegationSignal;
+  // Require explicit delegation markers at RAW line start (no trim)
+  // This prevents matching indented code blocks, quoted examples, or prose
+  const lines = text.split('\n');
+  for (const line of lines) {
+    // Must start at column 0 - no leading whitespace
+    if (
+      line.startsWith("[agent]") ||
+      line.startsWith("TASK:") ||
+      line.startsWith("CONSTRAINT:") ||
+      line.startsWith("ACCEPTANCE:") ||
+      line.startsWith("FILE:") ||
+      line.startsWith("INPUT:") ||
+      line.startsWith("OUTPUT:") ||
+      line.startsWith("DESCRIPTION:")
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function formatMatchedSkillsInjection(
