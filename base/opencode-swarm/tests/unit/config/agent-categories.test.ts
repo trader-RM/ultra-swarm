@@ -22,10 +22,10 @@ describe('agent-categories', () => {
 	});
 
 	describe('AGENT_CATEGORY map', () => {
-		test('has exactly 11 entries', () => {
-			// v6.36.0: added critic_drift_verifier
+		test('has exactly 61 entries', () => {
+			// Full ECC expansion: 14 core + 18 review/qa + 16 pipeline + 11 support + 2 design = 61 total
 			const entries = Object.entries(AGENT_CATEGORY);
-			expect(entries).toHaveLength(11);
+			expect(entries).toHaveLength(61);
 		});
 
 		test('architect maps to orchestrator', () => {

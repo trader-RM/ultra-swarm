@@ -22,6 +22,8 @@ const ECC_REVIEW_QA_AGENTS = [
 	'healthcare_reviewer',
 	'gan_evaluator',
 	'opensource_sanitizer',
+	'pr_test_analyzer',
+	'silent_failure_hunter',
 ] as const;
 
 const ECC_BUILD_AGENTS = [
@@ -43,6 +45,7 @@ const ECC_PIPELINE_AGENTS = [
 	'gan_generator',
 	'opensource_forker',
 	'opensource_packager',
+	'code_simplifier',
 ] as const;
 
 const ECC_SUPPORT_AGENTS = [
@@ -53,6 +56,19 @@ const ECC_SUPPORT_AGENTS = [
 	'loop_operator',
 	'chief_of_staff',
 	'gan_planner',
+	'code_architect',
+	'code_explorer',
+	'comment_analyzer',
+	'conversation_analyzer',
+] as const;
+
+const ECC_DESIGN_SUPPORT_AGENTS = [
+	'a11y_architect',
+	'seo_specialist',
+] as const;
+
+const ECC_ANALYSIS_AGENTS = [
+	'type_design_analyzer',
 ] as const;
 
 const ALL_ECC_AGENTS = [
@@ -60,10 +76,12 @@ const ALL_ECC_AGENTS = [
 	...ECC_BUILD_AGENTS,
 	...ECC_PIPELINE_AGENTS,
 	...ECC_SUPPORT_AGENTS,
+	...ECC_DESIGN_SUPPORT_AGENTS,
+	...ECC_ANALYSIS_AGENTS,
 ] as const;
 
 describe('ECC Agent Registration', () => {
-	describe('ALL_SUBAGENT_NAMES contains all 37 ECC agents', () => {
+	describe('ALL_SUBAGENT_NAMES contains all 47 ECC agents', () => {
 		it('has all ECC Review/QA agents (15)', () => {
 			for (const name of ECC_REVIEW_QA_AGENTS) {
 				expect(ALL_SUBAGENT_NAMES).toContain(name);
@@ -88,12 +106,24 @@ describe('ECC Agent Registration', () => {
 			}
 		});
 
-		it('total ECC agent count is 37', () => {
-			expect(ALL_ECC_AGENTS.length).toBe(37);
+		it('has all ECC Design Support agents (2)', () => {
+			for (const name of ECC_DESIGN_SUPPORT_AGENTS) {
+				expect(ALL_SUBAGENT_NAMES).toContain(name);
+			}
+		});
+
+		it('has all ECC Analysis agents (1)', () => {
+			for (const name of ECC_ANALYSIS_AGENTS) {
+				expect(ALL_SUBAGENT_NAMES).toContain(name);
+			}
+		});
+
+		it('total ECC agent count is 47', () => {
+			expect(ALL_ECC_AGENTS.length).toBe(47);
 		});
 	});
 
-	describe('AGENT_TOOL_MAP has entries for all 37 ECC agents', () => {
+	describe('AGENT_TOOL_MAP has entries for all 47 ECC agents', () => {
 		it('all Review/QA agents have tool assignments', () => {
 			for (const name of ECC_REVIEW_QA_AGENTS) {
 				expect(AGENT_TOOL_MAP[name as keyof typeof AGENT_TOOL_MAP]).toBeDefined();
@@ -121,9 +151,24 @@ describe('ECC Agent Registration', () => {
 				expect(AGENT_TOOL_MAP[name as keyof typeof AGENT_TOOL_MAP].length).toBeGreaterThan(0);
 			}
 		});
+
+		it('all Design Support agents have tool assignments', () => {
+			for (const name of ECC_DESIGN_SUPPORT_AGENTS) {
+				expect(AGENT_TOOL_MAP[name as keyof typeof AGENT_TOOL_MAP]).toBeDefined();
+				expect(AGENT_TOOL_MAP[name as keyof typeof AGENT_TOOL_MAP].length).toBeGreaterThan(0);
+			}
+		});
+
+		it('all Analysis agents are registered in AGENT_TOOL_MAP (empty tool list is intentional)', () => {
+			// type_design_analyzer uses [] — native OpenCode tools pass through via AgentConfig.permission.
+			// Only assert the entry exists; do NOT assert length > 0.
+			for (const name of ECC_ANALYSIS_AGENTS) {
+				expect(AGENT_TOOL_MAP[name as keyof typeof AGENT_TOOL_MAP]).toBeDefined();
+			}
+		});
 	});
 
-	describe('AGENT_CATEGORY has entries for all 37 ECC agents', () => {
+	describe('AGENT_CATEGORY has entries for all 47 ECC agents', () => {
 		it('Review/QA agents are in "qa" category', () => {
 			for (const name of ECC_REVIEW_QA_AGENTS) {
 				expect(AGENT_CATEGORY[name as keyof typeof AGENT_CATEGORY]).toBe('qa');
@@ -145,6 +190,18 @@ describe('ECC Agent Registration', () => {
 		it('Support agents are in "support" category', () => {
 			for (const name of ECC_SUPPORT_AGENTS) {
 				expect(AGENT_CATEGORY[name as keyof typeof AGENT_CATEGORY]).toBe('support');
+			}
+		});
+
+		it('Design Support agents are in "support" category', () => {
+			for (const name of ECC_DESIGN_SUPPORT_AGENTS) {
+				expect(AGENT_CATEGORY[name as keyof typeof AGENT_CATEGORY]).toBe('support');
+			}
+		});
+
+		it('Analysis agents are in "qa" category', () => {
+			for (const name of ECC_ANALYSIS_AGENTS) {
+				expect(AGENT_CATEGORY[name as keyof typeof AGENT_CATEGORY]).toBe('qa');
 			}
 		});
 	});

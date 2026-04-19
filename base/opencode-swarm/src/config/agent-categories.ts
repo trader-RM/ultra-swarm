@@ -45,6 +45,7 @@ export const AGENT_CATEGORY: Readonly<Record<string, AgentCategory>> = {
 	opensource_sanitizer: 'qa',
 	pr_test_analyzer: 'qa',
 	silent_failure_hunter: 'qa',
+	type_design_analyzer: 'qa',
 
 	// ECC Pipeline agents (build resolvers, generators, and executors)
 	build_error_resolver: 'pipeline',

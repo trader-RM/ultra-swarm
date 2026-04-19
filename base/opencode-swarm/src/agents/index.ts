@@ -434,8 +434,8 @@ If you call @coder instead of @${swarmId}_coder, the call will FAIL or go to the
 		agents.push(applyOverrides(designer, swarmAgents, swarmPrefix));
 	}
 
-	// === ECC Specialist Agent Registration (44 agents) ===
-	// Review/QA category (17 agents)
+	// === ECC Specialist Agent Registration (45 agents) ===
+	// Review/QA category (18 agents)
 	for (const eccAgent of [
 		{
 			name: 'code_reviewer',
@@ -504,6 +504,10 @@ If you call @coder instead of @${swarmId}_coder, the call will FAIL or go to the
 		{
 			name: 'silent_failure_hunter',
 			desc: 'Identifies silently failing code paths where errors are caught and swallowed without logging or reporting.',
+		},
+		{
+			name: 'type_design_analyzer',
+			desc: 'Analyzes type design for encapsulation, invariant expression, usefulness, and enforcement. Use PROACTIVELY when reviewing type hierarchies, interface contracts, or complex generic structures.',
 		},
 	] as const) {
 		if (!isAgentDisabled(eccAgent.name, swarmAgents, swarmPrefix)) {

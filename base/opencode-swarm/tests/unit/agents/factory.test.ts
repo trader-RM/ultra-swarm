@@ -25,9 +25,9 @@ afterEach(() => {
 
 describe('createAgents', () => {
 	describe('no config', () => {
-	it('returns 59 agents (15 native + 44 ECC, docs enabled by default, designer opt-in)', () => {
+	it('returns 60 agents (15 native + 45 ECC, docs enabled by default, designer opt-in)', () => {
 		const agents = createAgents();
-		expect(agents).toHaveLength(59);
+		expect(agents).toHaveLength(60);
 	});
 
 		it('agent names are correct', () => {
@@ -92,6 +92,7 @@ describe('createAgents', () => {
 				'sme',
 				'tdd_guide',
 				'test_engineer',
+				'type_design_analyzer',
 				'typescript_reviewer',
 				// Note: designer is opt-in (ui_review.enabled=true), not included by default
 			]);
@@ -169,8 +170,8 @@ describe('createAgents', () => {
 			const agents = createAgents(config as unknown as PluginConfig);
 			const sme = agents.find((a) => a.name === 'sme');
 			expect(sme).toBeUndefined();
-			// 59 agents - 1 disabled = 58 agents (docs still included by default)
-			expect(agents).toHaveLength(58);
+			// 60 agents - 1 disabled = 59 agents (docs still included by default)
+			expect(agents).toHaveLength(59);
 		});
 	});
 
@@ -243,6 +244,7 @@ describe('createAgents', () => {
 				'sme',
 				'tdd_guide',
 				'test_engineer',
+				'type_design_analyzer',
 				'typescript_reviewer',
 				// Note: designer is opt-in, not included by default
 			]);
@@ -318,6 +320,7 @@ describe('createAgents', () => {
 				'local_sme',
 				'local_tdd_guide',
 				'local_test_engineer',
+				'local_type_design_analyzer',
 				'local_typescript_reviewer',
 				// Note: designer is opt-in, not included by default
 			]);
@@ -503,7 +506,7 @@ describe('getAgentConfigs', () => {
 
 		const configs = getAgentConfigs(config as unknown as PluginConfig);
 		expect(configs.sme).toBeUndefined();
-		// 59 agents - 1 disabled = 58 agents (docs included by default)
-		expect(Object.keys(configs)).toHaveLength(58);
+		// 60 agents - 1 disabled = 59 agents (docs included by default)
+		expect(Object.keys(configs)).toHaveLength(59);
 	});
 });
