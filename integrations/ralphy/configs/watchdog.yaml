@@ -1,0 +1,31 @@
+# Ralphy Watchdog Configuration for Ultra Swarm
+# This config runs Ralphy as a HEALTH MONITOR only — it never executes tasks.
+# It watches .swarm/ artifacts for signs of progress and alerts on staleness.
+
+project:
+  name: "Ultra Swarm Watchdog"
+  language: "TypeScript"
+  framework: "OpenCode Plugin"
+
+commands:
+  test: ""
+  lint: ""
+  build: ""
+
+rules:
+  - "NEVER write to .swarm/ directory — read only"
+  - "NEVER delegate to coder, reviewer, or test_engineer agents"
+  - "NEVER modify any file in the project — this is an observational watchdog"
+  - "Only READ .swarm/plan.md, .swarm/evidence/, and .swarm/context.md"
+  - "Report staleness by alerting the user, not by taking autonomous action"
+  - "A session is STUCK if no new evidence files appear for 15 minutes"
+  - "A session is STALE if .swarm/context.md has not been updated for 30 minutes"
+
+boundaries:
+  never_touch:
+    - ".swarm/**"
+    - "base/**"
+    - "integrations/**"
+
+capabilities:
+  browser: "false"
