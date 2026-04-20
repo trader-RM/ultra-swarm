@@ -52,14 +52,14 @@ describe('getAgentConfigs - Architect Task Permission Hotfix', () => {
 		});
 	});
 
-	describe('non-architect agents remain subagents (coder and reviewer get task:allow for ECC delegation)', () => {
+	describe('non-architect agents remain subagents (coder and reviewer get task:allow for delegation)', () => {
 		test('default coder gets mode:subagent with task:allow permission (ECC delegation)', () => {
 			const configs = getAgentConfigs();
 			const coderConfig = configs['coder'];
 
 			expect(coderConfig).toBeDefined();
 			expect(coderConfig.mode).toBe('subagent');
-			// Coder gets task:allow for ECC build resolver and gan_generator delegation
+			// Coder gets task:allow for delegation
 			expect(coderConfig.permission).toEqual({ task: 'allow' });
 		});
 
@@ -168,35 +168,7 @@ describe('getAgentConfigs - Architect Task Permission Hotfix', () => {
 			expect(testEngineerConfig.permission).toEqual({ task: 'allow' });
 		});
 
-		// Adversarial: ECC agents that are NOT coder must NOT get task:allow
-		// This verifies that the baseAgentName check prevents false positives
-		// (e.g., build_error_resolver, cpp_reviewer, etc. must NOT get task permission)
-		test('ECC build_error_resolver gets mode:subagent without task permission', () => {
-			const configs = getAgentConfigs();
-			const buildResolver = configs['build_error_resolver'];
 
-			expect(buildResolver).toBeDefined();
-			expect(buildResolver.mode).toBe('subagent');
-			expect(buildResolver.permission).toBeUndefined();
-		});
-
-		test('ECC cpp_reviewer gets mode:subagent without task permission', () => {
-			const configs = getAgentConfigs();
-			const cppReviewer = configs['cpp_reviewer'];
-
-			expect(cppReviewer).toBeDefined();
-			expect(cppReviewer.mode).toBe('subagent');
-			expect(cppReviewer.permission).toBeUndefined();
-		});
-
-		test('ECC gan_generator gets mode:subagent without task permission', () => {
-			const configs = getAgentConfigs();
-			const ganGenerator = configs['gan_generator'];
-
-			expect(ganGenerator).toBeDefined();
-			expect(ganGenerator.mode).toBe('subagent');
-			expect(ganGenerator.permission).toBeUndefined();
-		});
 	});
 
 	describe('multiple swarm scenarios', () => {

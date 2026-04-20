@@ -73,13 +73,13 @@ describe('createDocsAgent', () => {
 		expect(agent.config.prompt?.startsWith('## IDENTITY')).toBe(true);
 	});
 
-	test('contains delegation directive', () => {
-		const agent = createDocsAgent(testModel);
-		const prompt = agent.config.prompt || '';
-		expect(prompt).toContain('APPROVED ECC AGENTS');
-		expect(prompt).toContain('doc_updater');
-		expect(prompt).toContain('docs_lookup');
-	});
+		test('contains delegation directive', () => {
+			const agent = createDocsAgent(testModel);
+			const prompt = agent.config.prompt || '';
+			expect(prompt).toContain('APPROVED AGENTS');
+			expect(prompt).toContain('doc-updater');
+			expect(prompt).toContain('docs-lookup');
+		});
 
 	test('contains identity reinforcement', () => {
 		const agent = createDocsAgent(testModel);
@@ -151,12 +151,12 @@ describe('createDesignerAgent', () => {
 		expect(prompt).toContain('QUALIFIED DELEGATION ONLY');
 	});
 
-	test('contains ECC-approved agents', () => {
-		const agent = createDesignerAgent(testModel);
-		const prompt = agent.config.prompt || '';
-		expect(prompt).toContain('a11y_architect');
-		expect(prompt).toContain('seo_specialist');
-	});
+		test('contains ECC-approved agents', () => {
+			const agent = createDesignerAgent(testModel);
+			const prompt = agent.config.prompt || '';
+			expect(prompt).toContain('a11y-architect');
+			expect(prompt).toContain('seo-specialist');
+		});
 
 	test('contains WCAG AA contrast requirements', () => {
 		const agent = createDesignerAgent(testModel);

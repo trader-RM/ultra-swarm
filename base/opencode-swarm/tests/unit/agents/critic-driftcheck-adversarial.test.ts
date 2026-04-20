@@ -253,9 +253,9 @@ describe('critic.ts PHASE DRIFT VERIFIER ADVERSARIAL', () => {
 		expect(prompt).toContain('DEFAULT POSTURE: SKEPTICAL');
 	});
 
-	it('should allow delegation to planner and gan_planner', () => {
+	it('should allow delegation to planner and gan-planner', () => {
 		expect(prompt).toContain('planner');
-		expect(prompt).toContain('gan_planner');
+		expect(prompt).toContain('gan-planner');
 	});
 
 	it('should disambiguate from plan_critic and sounding_board', () => {

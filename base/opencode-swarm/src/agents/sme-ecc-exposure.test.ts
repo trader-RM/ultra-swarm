@@ -42,6 +42,6 @@ describe('sme ECC Delegation Exposure', () => {
     it('explicitly states CAN delegate to approved ECC specialist agents', () => {
         const agent = createSMEAgent('gpt-4');
         const prompt = agent.config.prompt!;
-        expect(prompt).toContain('you CAN delegate to approved specialist agents');
+        expect(prompt).toContain('CAN delegate to approved ECC specialist agents');
     });
 });

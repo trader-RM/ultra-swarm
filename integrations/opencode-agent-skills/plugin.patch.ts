@@ -26,9 +26,41 @@ import {
 import { injectSkillsList, getSkillSummaries } from "./skills";
 import { GetAvailableSkills, ReadSkillFile, RunSkillScript, UseSkill } from "./tools";
 import { matchSkills, precomputeSkillEmbeddings } from "./embeddings";
+import fs from "node:fs";
+import path from "node:path";
 
 const setupCompleteSessions = new Set<string>();
 const loadedSkillsPerSession = new Map<string, Set<string>>();
+
+// Mandatory skill injection configuration - when false, matched skills are tracked but not injected
+const mandatorySkillInjection = 
+  !(process.env.SKILLS_MANDATORY_INJECTION === "false" || process.env.SKILLS_MANDATORY_INJECTION === "0");
+
+/**
+ * Append a skill suggestion entry to the tracking file
+ * @param baseDir The base directory where .swarm/ should be created
+ * @param entry The suggestion entry to append
+ */
+export function appendSkillSuggestion(
+  baseDir: string,
+  entry: {
+    timestamp: string;
+    sessionId: string;
+    matchedSkills: string[];
+    threshold: number;
+    mandatory: boolean;
+    injected: number;
+  }
+): void {
+  try {
+    const swarmDir = path.join(baseDir, ".swarm");
+    fs.mkdirSync(swarmDir, { recursive: true });
+    const filePath = path.join(swarmDir, "skill-suggestions.jsonl");
+    fs.appendFileSync(filePath, JSON.stringify(entry) + "\n");
+  } catch (error) {
+    console.warn("Failed to append skill suggestion to tracker:", error);
+  }
+}
 
 function getLoadedSkills(sessionID: string): Set<string> {
   let set = loadedSkillsPerSession.get(sessionID);
@@ -173,10 +205,29 @@ export const SkillsPlugin: Plugin = async ({ client, $, directory }) => {
         return;
       }
 
-      const matchedSkills = await matchSkills(matchText, skills);
+      const matchedSkills = await matchSkills(matchText, skills, 0.70);
 
       const loadedSkills = getLoadedSkills(sessionID);
       const newSkills = matchedSkills.filter(s => !loadedSkills.has(s.name));
+
+      // Track skill suggestions regardless of mandatory injection setting
+      const suggestionEntry = {
+        timestamp: new Date().toISOString(),
+        sessionId: sessionID,
+        matchedSkills: matchedSkills.map(s => s.name),
+        threshold: 0.70,
+        mandatory: mandatorySkillInjection,
+        injected: mandatorySkillInjection ? newSkills.length : 0
+      };
+      appendSkillSuggestion(directory, suggestionEntry);
+
+      // Update loaded skills regardless of mandatory injection setting
+      newSkills.forEach(s => loadedSkills.add(s.name));
+
+      // Skip injection if mandatorySkillInjection is disabled
+      if (!mandatorySkillInjection) {
+        return;
+      }
 
       if (newSkills.length === 0) {
         return;

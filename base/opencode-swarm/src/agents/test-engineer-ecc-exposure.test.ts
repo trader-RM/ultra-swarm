@@ -42,6 +42,6 @@ describe('test-engineer ECC Delegation Exposure', () => {
     it('explicitly states CAN delegate to approved ECC specialist test agents', () => {
         const agent = createTestEngineerAgent('gpt-4');
         const prompt = agent.config.prompt!;
-        expect(prompt).toContain('you CAN delegate to approved specialist test agents');
+        expect(prompt).toContain('CAN delegate to approved ECC specialist test agents');
     });
 });

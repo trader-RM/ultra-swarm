@@ -91,9 +91,7 @@ describe('Critic ECC Exposure — Phase 7', () => {
 		for (const prompt of criticPrompts) {
 			for (const agent of APPROVED_CRITIC_AGENTS) {
 			test(`${agent} is listed in ${prompt === PLAN_CRITIC_PROMPT ? 'PLAN_CRITIC_PROMPT' : prompt === SOUNDING_BOARD_PROMPT ? 'SOUNDING_BOARD_PROMPT' : prompt === PHASE_DRIFT_VERIFIER_PROMPT ? 'PHASE_DRIFT_VERIFIER_PROMPT' : 'AUTONOMOUS_OVERSIGHT_PROMPT'}`, () => {
-				// Convert hyphens to underscores to match actual prompt format
-				const agentWithUnderscore = agent.replace(/-/g, '_');
-				expect(prompt).toContain(`- ${agentWithUnderscore}`);
+				expect(prompt).toContain(`- ${agent}`);
 			});
 			}
 		}
@@ -110,9 +108,7 @@ describe('Critic ECC Exposure — Phase 7', () => {
 			for (const prompt of criticPrompts) {
 				for (const agent of SKIPPED_NONEXISTENT_AGENTS) {
 					test(`${agent} is NOT listed in prompt`, () => {
-						// Convert hyphens to underscores to match actual prompt format
-						const agentWithUnderscore = agent.replace(/-/g, '_');
-						expect(prompt).not.toContain(`- ${agentWithUnderscore} `);
+						expect(prompt).not.toContain(`- ${agent} `);
 					});
 				}
 			}
@@ -129,9 +125,7 @@ describe('Critic ECC Exposure — Phase 7', () => {
 			for (const prompt of criticPrompts) {
 				for (const agent of EXCLUDED_ECC_AGENTS) {
 					test(`${agent} is NOT in prompt delegation list`, () => {
-						// Convert hyphens to underscores to match actual prompt format
-						const agentWithUnderscore = agent.replace(/-/g, '_');
-						const delegationPattern = `- ${agentWithUnderscore} `;
+						const delegationPattern = `- ${agent} `;
 						expect(prompt).not.toContain(delegationPattern);
 					});
 				}

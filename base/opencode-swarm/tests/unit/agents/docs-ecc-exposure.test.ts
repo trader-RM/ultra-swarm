@@ -71,9 +71,7 @@ describe('Docs ECC Exposure — Phase 8', () => {
 	describe('Approved ECC doc agents in prompt', () => {
 		for (const agent of APPROVED_DOCS_AGENTS) {
 			test(`${agent} is listed in DOCS_PROMPT`, () => {
-				// Convert hyphens to underscores to match actual prompt format
-				const agentWithUnderscore = agent.replace(/-/g, '_');
-				expect(DOCS_PROMPT).toContain(`- ${agentWithUnderscore}`);
+				expect(DOCS_PROMPT).toContain(`- ${agent}`);
 			});
 		}
 	});

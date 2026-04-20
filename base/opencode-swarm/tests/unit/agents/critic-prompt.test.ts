@@ -175,11 +175,11 @@ describe('MODE: ANALYZE — adversarial security', () => {
 	const agent = createCriticAgent('test-model');
 	const prompt = agent.config.prompt!;
 
-	it('1. Prompt injection resistance — CRITIC_PROMPT allows delegation to planner/gan_planner', () => {
-		// Verify the prompt explicitly allows delegation to planner and gan_planner
+	it('1. Prompt injection resistance — CRITIC_PROMPT allows delegation to planner/gan-planner', () => {
+		// Verify the prompt explicitly allows delegation to planner and gan-planner
 		const allowsDelegation =
 			prompt.includes('delegation') &&
-			(prompt.includes('planner') || prompt.includes('gan_planner'));
+			(prompt.includes('planner') || prompt.includes('gan-planner'));
 
 		expect(allowsDelegation).toBe(true);
 	});
@@ -345,9 +345,9 @@ describe('PHASE_DRIFT_VERIFIER_PROMPT — adversarial', () => {
 		expect(verdictSection).not.toContain('REJECTED');
 	});
 
-	it('4. Allows delegation to planner and gan_planner', () => {
+	it('4. Allows delegation to planner and gan-planner', () => {
 		expect(prompt).toContain('planner');
-		expect(prompt).toContain('gan_planner');
+		expect(prompt).toContain('gan-planner');
 	});
 
 	it('5. Agent identity — no IGNORE them instruction (removed in Phase 7)', () => {

@@ -25,75 +25,28 @@ afterEach(() => {
 
 describe('createAgents', () => {
 	describe('no config', () => {
-	it('returns 60 agents (15 native + 45 ECC, docs enabled by default, designer opt-in)', () => {
+	it('returns 13 agents (13 native Swarm agents, designer opt-in)', () => {
 		const agents = createAgents();
-		expect(agents).toHaveLength(60);
+		expect(agents).toHaveLength(13);
 	});
 
 		it('agent names are correct', () => {
 			const agents = createAgents();
 			const names = agents.map((a) => a.name).sort();
 			expect(names).toEqual([
-				'a11y_architect',
 				'architect',
-				'build_error_resolver',
-				'chief_of_staff',
-				'code_architect',
-				'code_explorer',
-				'code_reviewer',
-				'code_simplifier',
 				'coder',
-				'comment_analyzer',
-				'conversation_analyzer',
-				'cpp_build_resolver',
-				'cpp_reviewer',
 				'critic',
 				'critic_drift_verifier',
 				'critic_oversight',
 				'critic_sounding_board',
-				'csharp_reviewer',
 				'curator_init',
 				'curator_phase',
-				'dart_build_resolver',
-				'database_reviewer',
-				'doc_updater',
 				'docs',
-				'docs_lookup',
-				'e2e_runner',
 				'explorer',
-				'flutter_reviewer',
-				'gan_evaluator',
-				'gan_generator',
-				'gan_planner',
-				'go_build_resolver',
-				'go_reviewer',
-				'harness_optimizer',
-				'healthcare_reviewer',
-				'java_build_resolver',
-				'java_reviewer',
-				'kotlin_build_resolver',
-				'kotlin_reviewer',
-				'loop_operator',
-				'opensource_forker',
-				'opensource_packager',
-				'opensource_sanitizer',
-				'performance_optimizer',
-				'planner',
-				'pr_test_analyzer',
-				'python_reviewer',
-				'pytorch_build_resolver',
-				'refactor_cleaner',
 				'reviewer',
-				'rust_build_resolver',
-				'rust_reviewer',
-				'security_reviewer',
-				'seo_specialist',
-				'silent_failure_hunter',
 				'sme',
-				'tdd_guide',
-				'test_engineer',
-				'type_design_analyzer',
-				'typescript_reviewer',
+				'test_engineer'
 				// Note: designer is opt-in (ui_review.enabled=true), not included by default
 			]);
 		});
@@ -170,8 +123,8 @@ describe('createAgents', () => {
 			const agents = createAgents(config as unknown as PluginConfig);
 			const sme = agents.find((a) => a.name === 'sme');
 			expect(sme).toBeUndefined();
-			// 60 agents - 1 disabled = 59 agents (docs still included by default)
-			expect(agents).toHaveLength(59);
+			// 13 agents - 1 disabled = 12 agents (docs still included by default)
+			expect(agents).toHaveLength(12);
 		});
 	});
 
@@ -186,66 +139,19 @@ describe('createAgents', () => {
 			const agents = createAgents(config as unknown as PluginConfig);
 			const names = agents.map((a) => a.name).sort();
 			expect(names).toEqual([
-				'a11y_architect',
 				'architect',
-				'build_error_resolver',
-				'chief_of_staff',
-				'code_architect',
-				'code_explorer',
-				'code_reviewer',
-				'code_simplifier',
 				'coder',
-				'comment_analyzer',
-				'conversation_analyzer',
-				'cpp_build_resolver',
-				'cpp_reviewer',
 				'critic',
 				'critic_drift_verifier',
 				'critic_oversight',
 				'critic_sounding_board',
-				'csharp_reviewer',
 				'curator_init',
 				'curator_phase',
-				'dart_build_resolver',
-				'database_reviewer',
-				'doc_updater',
 				'docs',
-				'docs_lookup',
-				'e2e_runner',
 				'explorer',
-				'flutter_reviewer',
-				'gan_evaluator',
-				'gan_generator',
-				'gan_planner',
-				'go_build_resolver',
-				'go_reviewer',
-				'harness_optimizer',
-				'healthcare_reviewer',
-				'java_build_resolver',
-				'java_reviewer',
-				'kotlin_build_resolver',
-				'kotlin_reviewer',
-				'loop_operator',
-				'opensource_forker',
-				'opensource_packager',
-				'opensource_sanitizer',
-				'performance_optimizer',
-				'planner',
-				'pr_test_analyzer',
-				'python_reviewer',
-				'pytorch_build_resolver',
-				'refactor_cleaner',
 				'reviewer',
-				'rust_build_resolver',
-				'rust_reviewer',
-				'security_reviewer',
-				'seo_specialist',
-				'silent_failure_hunter',
 				'sme',
-				'tdd_guide',
-				'test_engineer',
-				'type_design_analyzer',
-				'typescript_reviewer',
+				'test_engineer'
 				// Note: designer is opt-in, not included by default
 			]);
 		});
@@ -262,66 +168,19 @@ describe('createAgents', () => {
 			const agents = createAgents(config as unknown as PluginConfig);
 			const names = agents.map((a) => a.name).sort();
 			expect(names).toEqual([
-				'local_a11y_architect',
 				'local_architect',
-				'local_build_error_resolver',
-				'local_chief_of_staff',
-				'local_code_architect',
-				'local_code_explorer',
-				'local_code_reviewer',
-				'local_code_simplifier',
 				'local_coder',
-				'local_comment_analyzer',
-				'local_conversation_analyzer',
-				'local_cpp_build_resolver',
-				'local_cpp_reviewer',
 				'local_critic',
 				'local_critic_drift_verifier',
 				'local_critic_oversight',
 				'local_critic_sounding_board',
-				'local_csharp_reviewer',
 				'local_curator_init',
 				'local_curator_phase',
-				'local_dart_build_resolver',
-				'local_database_reviewer',
-				'local_doc_updater',
 				'local_docs',
-				'local_docs_lookup',
-				'local_e2e_runner',
 				'local_explorer',
-				'local_flutter_reviewer',
-				'local_gan_evaluator',
-				'local_gan_generator',
-				'local_gan_planner',
-				'local_go_build_resolver',
-				'local_go_reviewer',
-				'local_harness_optimizer',
-				'local_healthcare_reviewer',
-				'local_java_build_resolver',
-				'local_java_reviewer',
-				'local_kotlin_build_resolver',
-				'local_kotlin_reviewer',
-				'local_loop_operator',
-				'local_opensource_forker',
-				'local_opensource_packager',
-				'local_opensource_sanitizer',
-				'local_performance_optimizer',
-				'local_planner',
-				'local_pr_test_analyzer',
-				'local_python_reviewer',
-				'local_pytorch_build_resolver',
-				'local_refactor_cleaner',
 				'local_reviewer',
-				'local_rust_build_resolver',
-				'local_rust_reviewer',
-				'local_security_reviewer',
-				'local_seo_specialist',
-				'local_silent_failure_hunter',
 				'local_sme',
-				'local_tdd_guide',
-				'local_test_engineer',
-				'local_type_design_analyzer',
-				'local_typescript_reviewer',
+				'local_test_engineer'
 				// Note: designer is opt-in, not included by default
 			]);
 		});
@@ -506,7 +365,7 @@ describe('getAgentConfigs', () => {
 
 		const configs = getAgentConfigs(config as unknown as PluginConfig);
 		expect(configs.sme).toBeUndefined();
-		// 60 agents - 1 disabled = 59 agents (docs included by default)
-		expect(Object.keys(configs)).toHaveLength(59);
+		// 13 agents - 1 disabled = 12 agents (docs included by default)
+		expect(Object.keys(configs)).toHaveLength(12);
 	});
 });

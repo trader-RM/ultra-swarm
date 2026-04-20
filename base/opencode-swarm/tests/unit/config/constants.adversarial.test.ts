@@ -30,43 +30,21 @@ describe('constants.ts Adversarial', () => {
 			}
 		});
 
-		it('No agent should have an empty tool list unless explicitly intended (SME/Docs etc should have some)', () => {
-			// Agents intentionally allowed to have an empty swarm tool list:
-			// type_design_analyzer — native-tools-only ECC agent; Read/Grep/Glob/Bash pass through
-			// via AgentConfig.permission and are not governed by this map.
-			const INTENTIONALLY_EMPTY: string[] = ['type_design_analyzer'];
+		it('No agent should have an empty tool list', () => {
 			for (const [agent, tools] of Object.entries(AGENT_TOOL_MAP)) {
-				if (INTENTIONALLY_EMPTY.includes(agent)) continue;
-				// curator_init/phase and conversation_analyzer are 'lightweight' but should still have knowledge_recall
 				expect(tools.length).toBeGreaterThan(0);
 			}
 		});
 	});
 
 	describe('DEFAULT_MODELS Fallback Behavior', () => {
-		it('Every agent (except architect) resolves to a non-empty string via fallback', () => {
+		it('Every agent except architect is explicitly listed in DEFAULT_MODELS (no fallback needed)', () => {
 			for (const agent of ALL_AGENT_NAMES) {
 				if (agent === 'architect') continue;
-				const resolved = DEFAULT_MODELS[agent] ?? DEFAULT_MODELS.default;
-				expect(typeof resolved).toBe('string');
-				expect(resolved.length).toBeGreaterThan(0);
+				expect(DEFAULT_MODELS[agent]).toBeDefined();
+				expect(typeof DEFAULT_MODELS[agent]).toBe('string');
+				expect(DEFAULT_MODELS[agent]!.length).toBeGreaterThan(0);
 			}
-		});
-
-		it('At least one agent not explicitly listed in DEFAULT_MODELS resolves to DEFAULT_MODELS.default', () => {
-			// Find an agent that is NOT explicitly listed in DEFAULT_MODELS
-			let foundMissingAgent = false;
-			for (const agent of ALL_AGENT_NAMES) {
-				if (agent === 'architect') continue;
-				if (DEFAULT_MODELS[agent] === undefined) {
-					foundMissingAgent = true;
-					const resolved = DEFAULT_MODELS[agent] ?? DEFAULT_MODELS.default;
-					expect(resolved).toBe(DEFAULT_MODELS.default);
-					break;
-				}
-			}
-			// Ensure we actually tested the fallback behavior
-			expect(foundMissingAgent).toBe(true);
 		});
 
 		it('Ensure DEFAULT_MODELS does not contain "ghost" agents not in ALL_AGENT_NAMES', () => {

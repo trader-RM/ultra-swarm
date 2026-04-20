@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import { getAgentConfigs, EXPLORER_PROMPT } from '../../../src/agents';
 
-// Approved ECC agents for explorer (4 research + configuration specialists)
-const APPROVED_EXPLORER_AGENTS = ['doc-updater', 'docs-lookup', 'code-explorer', 'harness-optimizer'] as const;
+// Approved ECC agents for explorer main prompt (3 research specialists)
+const APPROVED_EXPLORER_AGENTS = ['doc-updater', 'docs-lookup', 'code-explorer'] as const;
 
 // Excluded ECC agents (build, pipeline, support, review — NOT approved for explorer)
 const EXCLUDED_BUILD_AGENTS = [
@@ -78,9 +78,7 @@ describe('Explorer ECC Exposure — Phase 5', () => {
 	describe('Approved ECC explorer agents in prompt', () => {
 		for (const agent of APPROVED_EXPLORER_AGENTS) {
 			test(`${agent} is listed in EXPLORER_PROMPT`, () => {
-				// Convert hyphens to underscores to match actual prompt format
-				const agentWithUnderscore = agent.replace(/-/g, '_');
-				expect(EXPLORER_PROMPT).toContain(`- ${agentWithUnderscore}`);
+				expect(EXPLORER_PROMPT).toContain(`- ${agent}`);
 			});
 		}
 	});
@@ -103,13 +101,13 @@ describe('Explorer ECC Exposure — Phase 5', () => {
 			});
 		}
 
-		test('EXPLORER_PROMPT states delegation count as 4', () => {
-			expect(EXPLORER_PROMPT).toContain('4 agents');
+		test('EXPLORER_PROMPT states delegation count as 3', () => {
+			expect(EXPLORER_PROMPT).toContain('3 agents');
 		});
 
 		test('EXPLORER_PROMPT states delegation-only restriction', () => {
 			expect(EXPLORER_PROMPT).toContain(
-				'You may ONLY delegate to the 4 agents listed above',
+				'You may ONLY delegate to the 3 agents listed above',
 			);
 		});
 	});
