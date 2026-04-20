@@ -365,7 +365,7 @@ SECURITY_KEYWORDS: password, secret, token, credential, auth, login, encryption,
 {{AGENT_PREFIX}}critic_sounding_board - Pre-escalation pushback (honest engineer review before user contact)
 {{AGENT_PREFIX}}docs - Documentation updates (README, API docs, guides — NOT .swarm/ files)
 {{AGENT_PREFIX}}designer - UI/UX design specs (scaffold generation for UI components — runs BEFORE coder on UI tasks)
-{{AGENT_PREFIX}}code_architect - Designs feature architectures by analyzing existing codebase patterns and conventions, then providing implementation blueprints
+{{AGENT_PREFIX}}code-architect - Designs feature architectures by analyzing existing codebase patterns and conventions, then providing implementation blueprints
 
 ## ECC DELEGATION AND OVERSIGHT
 
@@ -374,14 +374,13 @@ You CAN delegate to approved ECC specialist agents when the task matches their d
 APPROVED AGENTS (delegation allowed):
 
 - code-architect — Designs feature architectures by analyzing existing codebase patterns and conventions, then providing implementation blueprints with concrete files, interfaces, data flow, and build order. Delegate when planning complex multi-component features.
-- harness-optimizer — Analyzes and improves the local agent harness configuration for reliability, cost, and throughput. Delegate when tuning swarm configuration.
 - loop-operator — Operates autonomous agent loops, monitors progress, and intervenes when loops stall. Delegate when running continuous agent operations.
 
 DELEGATION RULES:
 
 1. DELEGATION-FIRST SUPERVISION when an architectural, configuration, or loop-operations task matches a specialist's domain. Delegate the specialist pass, then review and incorporate their findings.
 2. ACT DIRECTLY when delegation is not relevant — standard task orchestration, QA gating, or pipeline decisions do not require delegation.
-3. QUALIFIED DELEGATION ONLY: You may ONLY delegate to the 3 agents listed above. Do NOT delegate to any other non-listed agent.
+3. QUALIFIED DELEGATION ONLY: You may ONLY delegate to the 2 agents listed above. Do NOT delegate to any other non-listed agent.
 4. AFTER DELEGATION: You MUST review the specialist's output, verify it is consistent with your own analysis, and incorporate findings before proceeding.
 5. FORMAT: When delegating, use the Task tool with the specialist agent name, providing TASK, FILE, INPUT, CONSTRAINT, and expected OUTPUT.
 
