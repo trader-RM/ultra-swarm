@@ -14,14 +14,14 @@ const approvedSection = (() => {
 describe('Architect prompt ECC agent exposure', () => {
 	it('includes code-architect in AGENTS section', () => {
 		expect(ARCHITECT_PROMPT).toContain('code-architect');
-		expect(ARCHITECT_PROMPT).toContain('code-architect — Designs');
+		expect(ARCHITECT_PROMPT).toContain('code-architect ΓÇö Designs');
 	});
 
 	it('includes code-architect in Your agents line', () => {
 		expect(ARCHITECT_PROMPT).toContain('{{AGENT_PREFIX}}code-architect');
 	});
 
-	// Support agents — not approved for architect delegation
+	// Support agents ΓÇö not approved for architect delegation
 	it('excludes chief-of-staff from APPROVED AGENTS section', () => {
 		expect(approvedSection).not.toContain('chief-of-staff');
 	});
@@ -42,7 +42,7 @@ describe('Architect prompt ECC agent exposure', () => {
 		expect(approvedSection).not.toContain('docs-lookup');
 	});
 
-	// ECC review agents — not approved for architect delegation
+	// ECC review agents ΓÇö not approved for architect delegation
 	it('excludes code-reviewer from APPROVED AGENTS section', () => {
 		expect(approvedSection).not.toContain('code-reviewer');
 	});
@@ -103,7 +103,7 @@ describe('Architect prompt ECC agent exposure', () => {
 		expect(approvedSection).not.toContain('opensource-sanitizer');
 	});
 
-	// ECC build agents — not approved for architect delegation
+	// ECC build agents ΓÇö not approved for architect delegation
 	it('excludes build-error-resolver from APPROVED AGENTS section', () => {
 		expect(approvedSection).not.toContain('build-error-resolver');
 	});
@@ -136,7 +136,7 @@ describe('Architect prompt ECC agent exposure', () => {
 		expect(approvedSection).not.toContain('dart-build-resolver');
 	});
 
-	// ECC pipeline agents — not approved for architect delegation
+	// ECC pipeline agents ΓÇö not approved for architect delegation
 	it('excludes tdd-guide from APPROVED AGENTS section', () => {
 		expect(approvedSection).not.toContain('tdd-guide');
 	});
@@ -165,7 +165,7 @@ describe('Architect prompt ECC agent exposure', () => {
 		expect(approvedSection).not.toContain('opensource-packager');
 	});
 
-	// Native swarm agents — these are always referenced in the full prompt
+	// Native swarm agents ΓÇö these are always referenced in the full prompt
 	it('includes explorer native agent', () => {
 		expect(ARCHITECT_PROMPT).toContain('explorer');
 	});
@@ -217,4 +217,4 @@ describe('Architect prompt ECC agent exposure', () => {
 	it('includes curator_phase native agent', () => {
 		expect(ARCHITECT_PROMPT).toContain('curator_phase');
 	});
-});
+});

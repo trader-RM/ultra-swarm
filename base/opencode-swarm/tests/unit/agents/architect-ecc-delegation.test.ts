@@ -12,12 +12,12 @@ describe('Architect prompt APPROVED AGENTS section', () => {
 
 	it('lists code-architect as approved agent', () => {
 		expect(ARCHITECT_PROMPT).toContain('- code-architect');
-		expect(ARCHITECT_PROMPT).toContain('code-architect — Designs feature architectures');
+		expect(ARCHITECT_PROMPT).toContain('code-architect — Designs feature architectures by analyzing existing codebase patterns');
 	});
 
 	it('lists loop-operator as approved agent', () => {
 		expect(ARCHITECT_PROMPT).toContain('- loop-operator');
-		expect(ARCHITECT_PROMPT).toContain('loop-operator — Operates autonomous');
+		expect(ARCHITECT_PROMPT).toContain('loop-operator — Operates autonomous agent loops');
 	});
 
 	it('does NOT list harness-optimizer (moved to explorer)', () => {
@@ -32,4 +32,4 @@ describe('Architect prompt APPROVED AGENTS section', () => {
 	it('states 2 approved agents', () => {
 		expect(ARCHITECT_PROMPT).toContain('2 agents listed above');
 	});
-});
+});

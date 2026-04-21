@@ -12,6 +12,7 @@ export const ALL_SUBAGENT_NAMES = [
 	'designer',
 	'critic_sounding_board',
 	'critic_drift_verifier',
+	'critic_hallucination_verifier',
 	'curator_init',
 	'curator_phase',
 	...QA_AGENTS,
@@ -45,6 +46,7 @@ export const AGENT_TOOL_MAP: Record<AgentName, ToolName[]> = {
 		'knowledge_query',
 		'lint',
 		'diff',
+		'diff_summary',
 		'pkg_audit',
 		'pre_check_batch',
 		'quality_budget',
@@ -56,11 +58,14 @@ export const AGENT_TOOL_MAP: Record<AgentName, ToolName[]> = {
 		'secretscan',
 		'symbols',
 		'test_runner',
+		'test_impact',
+		'mutation_test',
 		'todo_extract',
 		'update_task_status',
 		'lint_spec',
 		'write_retro',
 		'write_drift_evidence',
+		'write_hallucination_evidence',
 		'declare_scope',
 		'sast_scan',
 		'sbom_generate',
@@ -112,6 +117,8 @@ export const AGENT_TOOL_MAP: Record<AgentName, ToolName[]> = {
 	],
 	test_engineer: [
 		'test_runner',
+		'test_impact',
+		'mutation_test',
 		'diff',
 		'symbols',
 		'extract_code_blocks',
@@ -135,6 +142,7 @@ export const AGENT_TOOL_MAP: Record<AgentName, ToolName[]> = {
 	],
 	reviewer: [
 		'diff',
+		'diff_summary',
 		'imports',
 		'lint',
 		'pkg_audit',
@@ -145,6 +153,7 @@ export const AGENT_TOOL_MAP: Record<AgentName, ToolName[]> = {
 		'retrieve_summary',
 		'extract_code_blocks',
 		'test_runner',
+		'test_impact',
 		'sast_scan',
 		'placeholder_scan',
 		'knowledge_recall',
@@ -182,6 +191,19 @@ export const AGENT_TOOL_MAP: Record<AgentName, ToolName[]> = {
 		'knowledge_recall',
 		'req_coverage',
 		'get_approved_plan',
+		'repo_map',
+	],
+	critic_hallucination_verifier: [
+		'complexity_hotspots',
+		'detect_domains',
+		'imports',
+		'retrieve_summary',
+		'symbols',
+		'batch_symbols',
+		'search',
+		'pkg_audit',
+		'knowledge_recall',
+		'req_coverage',
 		'repo_map',
 	],
 	critic_oversight: [
@@ -242,6 +264,8 @@ export const TOOL_DESCRIPTIONS: Partial<Record<ToolName, string>> = {
 	symbols: 'code symbol search',
 	checkpoint: 'state snapshots',
 	diff: 'structured git diff with contract change detection',
+	diff_summary:
+		'filter classified AST changes by category, risk level, or file for reviewer drill-down',
 	imports: 'dependency audit',
 	lint: 'code quality',
 	placeholder_scan: 'placeholder/todo detection',
@@ -249,6 +273,10 @@ export const TOOL_DESCRIPTIONS: Partial<Record<ToolName, string>> = {
 	sast_scan: 'static analysis security scan',
 	syntax_check: 'syntax validation',
 	test_runner: 'auto-detect and run tests',
+	test_impact:
+		'identify test files impacted by changed source files via import analysis',
+	mutation_test:
+		'executes pre-generated mutation patches against tests, evaluates kill rate against quality gate thresholds',
 	pkg_audit: 'dependency vulnerability scan — npm/pip/cargo',
 	complexity_hotspots: 'git churn × complexity risk map',
 	schema_drift: 'OpenAPI spec vs route drift',
@@ -264,6 +292,8 @@ export const TOOL_DESCRIPTIONS: Partial<Record<ToolName, string>> = {
 		'document phase retrospectives via phase_complete workflow, capture lessons learned',
 	write_drift_evidence:
 		'write drift verification evidence for a completed phase',
+	write_hallucination_evidence:
+		'write hallucination verification evidence for a completed phase',
 	declare_scope: 'declare file scope for next coder delegation',
 	phase_complete: 'mark a phase as complete and track dispatched agents',
 	save_plan: 'save a structured implementation plan',
@@ -302,6 +332,8 @@ export const TOOL_DESCRIPTIONS: Partial<Record<ToolName, string>> = {
 		'retrieve the QA gate profile for the current plan: gates, lock state, and profile hash. Read-only.',
 	set_qa_gates:
 		'configure the QA gate profile for the current plan. Architect-only. Ratchet-tighter only — rejected once the profile is locked after critic approval.',
+	req_coverage:
+		'query requirement coverage status for tracked functional requirements',
 };
 
 // Runtime validation: ensure all tool names in AGENT_TOOL_MAP are registered
@@ -334,6 +366,7 @@ export const DEFAULT_MODELS: Record<string, string> = {
 	critic: 'opencode/trinity-large-preview-free',
 	critic_sounding_board: 'opencode/trinity-large-preview-free',
 	critic_drift_verifier: 'opencode/trinity-large-preview-free',
+	critic_hallucination_verifier: 'opencode/trinity-large-preview-free',
 	critic_oversight: 'opencode/trinity-large-preview-free',
 	docs: 'opencode/trinity-large-preview-free',
 	designer: 'opencode/trinity-large-preview-free',
@@ -341,8 +374,6 @@ export const DEFAULT_MODELS: Record<string, string> = {
 	// Curator agents — lightweight read-only analysis (same model family as explorer)
 	curator_init: 'opencode/trinity-large-preview-free',
 	curator_phase: 'opencode/trinity-large-preview-free',
-
-
 
 	// Fallback
 	default: 'opencode/trinity-large-preview-free',

@@ -4,7 +4,7 @@ import { getAgentConfigs, EXPLORER_PROMPT } from '../../../src/agents';
 // Approved ECC agents for explorer main prompt (3 research specialists)
 const APPROVED_EXPLORER_AGENTS = ['doc-updater', 'docs-lookup', 'code-explorer'] as const;
 
-// Excluded ECC agents (build, pipeline, support, review — NOT approved for explorer)
+// Excluded ECC agents (build, pipeline, support, review ΓÇö NOT approved for explorer)
 const EXCLUDED_BUILD_AGENTS = [
 	'build-error-resolver',
 	'cpp-build-resolver',
@@ -74,7 +74,7 @@ const EXPLORER_MODES = [
 	'DOCUMENTATION DISCOVERY MODE',
 ] as const;
 
-describe('Explorer ECC Exposure — Phase 5', () => {
+describe('Explorer ECC Exposure ΓÇö Phase 5', () => {
 	describe('Approved ECC explorer agents in prompt', () => {
 		for (const agent of APPROVED_EXPLORER_AGENTS) {
 			test(`${agent} is listed in EXPLORER_PROMPT`, () => {

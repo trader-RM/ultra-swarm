@@ -35,9 +35,9 @@ describe('Swarm Agent Registration', () => {
 			}
 		});
 
-		it('total Swarm agent count in ALL_SUBAGENT_NAMES is 13 (plus architect separately)', () => {
-			// ALL_SUBAGENT_NAMES should contain 13 agents (excluding architect which is separate)
-			expect(ALL_SUBAGENT_NAMES.length).toBe(13);
+		it('total Swarm agent count in ALL_SUBAGENT_NAMES is 14 (plus architect separately)', () => {
+			// ALL_SUBAGENT_NAMES should contain 14 agents (excluding architect which is separate)
+			expect(ALL_SUBAGENT_NAMES.length).toBe(14);
 		});
 	});
 
@@ -114,4 +114,4 @@ describe('Swarm Agent Registration', () => {
 			}
 		});
 	});
-});
+});

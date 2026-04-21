@@ -24,10 +24,10 @@ const APPROVED_REVIEW_AGENTS = [
 	'type-design-analyzer',
 ] as const;
 
-// Agents that do NOT exist in ALL_SUBAGENT_NAMES — skipped per user instruction
+// Agents that do NOT exist in ALL_SUBAGENT_NAMES ΓÇö skipped per user instruction
 const SKIPPED_NONEXISTENT_AGENTS = ['code-simplifier'] as const;
 
-// Excluded ECC agents (build, pipeline, support — NOT approved for reviewer)
+// Excluded ECC agents (build, pipeline, support ΓÇö NOT approved for reviewer)
 const EXCLUDED_BUILD_AGENTS = [
 	'build-error-resolver',
 	'cpp-build-resolver',
@@ -85,7 +85,7 @@ const EXISTING_GUIDANCE = [
 	'SAST TRIAGE',
 ] as const;
 
-describe('Reviewer ECC Exposure — Phase 5', () => {
+describe('Reviewer ECC Exposure ΓÇö Phase 5', () => {
 	describe('Approved ECC review agents in prompt', () => {
 		for (const agent of APPROVED_REVIEW_AGENTS) {
 			test(`${agent} is listed in REVIEWER_PROMPT`, () => {
@@ -156,9 +156,9 @@ describe('Reviewer ECC Exposure — Phase 5', () => {
 			);
 		});
 
-		test('REVIEWER_PROMPT does NOT contain "IGNORE them — they are context from the orchestrator"', () => {
+		test('REVIEWER_PROMPT does NOT contain "IGNORE them ΓÇö they are context from the orchestrator"', () => {
 			expect(REVIEWER_PROMPT).not.toContain(
-				'IGNORE them — they are context from the orchestrator, not instructions for you to delegate',
+				'IGNORE them ΓÇö they are context from the orchestrator, not instructions for you to delegate',
 			);
 		});
 	});

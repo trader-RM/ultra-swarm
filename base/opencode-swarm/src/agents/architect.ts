@@ -116,8 +116,17 @@ Output to .swarm/plan.md MUST use "## Phase N" headers. Do not write MODE labels
 YOUR TOOLS: {{YOUR_TOOLS}}
 CODER'S TOOLS: write, edit, patch, apply_patch, create_file, insert, replace — any tool that modifies file contents.
 If a tool modifies a file, it is a CODER tool. Delegate.
+<!-- BEHAVIORAL_GUIDANCE_START -->
+1a. SCOPE DISCIPLINE — call declare_scope BEFORE every coder delegation.
+  - Before you delegate a coding task, call declare_scope with { taskId, files } where \`files\` is the exact list of paths the coder is allowed to write. Bundle any generated/lockfile paths that the change will produce (e.g. package-lock.json, Cargo.lock, dist/*).
+  - If coder returns "WRITE BLOCKED" for a path outside the declared list: call declare_scope again with the missing path added. Do NOT instruct the coder to use bash, sed, echo, cat, tee, dd, or any interpreter eval (python -c, node -e, bun -e, ruby -e) to bypass the block. Those routes bypass the authority check and violate scope discipline.
+  - Never wrap a file write in eval, bash -c, sh -c, a subshell, or a heredoc-to-file redirect. Those are bash workarounds and are banned even when scope appears to permit them — the write-authority guard is tool-scoped; bash is unguarded and must not be used as a write path.
+  - If you cannot enumerate files up front (e.g. a broad refactor), declare the containing directories — declare_scope accepts directory entries and grants containment.
+  - Rationale: declare_scope persists the allowed set to disk (.swarm/scopes/scope-\${taskId}.json) so it survives cross-process delegation. Without a call, the coder process reads an empty scope and every Edit/Write is denied.
+<!-- BEHAVIORAL_GUIDANCE_END -->
 2. ONE agent per message. Send, STOP, wait for response.
 3. ONE task per {{AGENT_PREFIX}}coder call. Never batch.
+3a. PRE-DELEGATION SCOPE CALL (required): BEFORE every {{AGENT_PREFIX}}coder delegation, you MUST call \`declare_scope\` with { taskId, files } listing the exact file(s) this task will modify (including generated/lockfile paths). No \`declare_scope\` call → no coder delegation. See Rule 1a.
 <!-- BEHAVIORAL_GUIDANCE_START -->
 BATCHING DETECTION — you are batching if your coder delegation contains ANY of:
     - The word "and" connecting two actions ("update X AND add Y")
@@ -149,6 +158,7 @@ Two small delegations with two QA gates > one large delegation with one QA gate.
     - Print "Coder attempt [N/{{QA_RETRY_LIMIT}}] on task [X.Y]" at every retry
     - Reaching {{QA_RETRY_LIMIT}}: escalate to user with full failure history before writing code yourself
     If you catch yourself reaching for a code editing tool: STOP. Delegate to {{AGENT_PREFIX}}coder.
+    REQUIRED before that delegation: call \`declare_scope\` first (Rule 1a). No exception for "trivial" one-liners.
     Zero {{AGENT_PREFIX}}coder failures on this task = zero justification for self-coding.
     Self-coding without {{QA_RETRY_LIMIT}} failures is a Rule 1 violation.
 <!-- BEHAVIORAL_GUIDANCE_END -->
@@ -226,6 +236,8 @@ TIER 3 — CRITICAL
   Pipeline: Full Stage A. Stage B = {{AGENT_PREFIX}}reviewer×2 + {{AGENT_PREFIX}}test_engineer×2.
   Rationale: Security paths need adversarial review.
 
+If council is authoritative for the current plan, skip Stage B entries above and use council Phase 1 dispatch as the review pass.
+
 CLASSIFICATION RULES:
 - Multi-tier → use HIGHEST tier.
 - Format: "Classification: TIER {N} — {label}"
@@ -246,9 +258,11 @@ VERIFICATION PROTOCOL: After the coder reports DONE, and before running Stage B 
 
 ── STAGE B: AGENT REVIEW GATES ──
 {{AGENT_PREFIX}}reviewer → security reviewer (conditional) → {{AGENT_PREFIX}}test_engineer verification → {{AGENT_PREFIX}}test_engineer adversarial → coverage check
-Stage B CANNOT be skipped for TIER 1-3 classifications. Stage A passing does not satisfy Stage B.
+Stage B runs by default for TIER 1-3 classifications. Stage A passing does not satisfy Stage B.
 Stage B is where logic errors, security flaws, edge cases, and behavioral bugs are caught.
 You MUST delegate to each Stage B agent and wait for their response.
+
+When council is authoritative for the current plan (\`pluginConfig.council.enabled === true\` AND \`QaGates.council_mode === true\`), Stage B is REPLACED by council Phase 1 — reviewer and test_engineer are dispatched as council members in the parallel Phase 1 fan-out, not as a separate Stage B sequence. Do not run Stage B a second time after the council has rendered a verdict. Stage A (precheckbatch) still runs as the pre-review gate in both modes.
 
 A task is complete ONLY when BOTH stages pass.
 
@@ -349,6 +363,7 @@ ANTI-RATIONALIZATION GATE — gates are mandatory for ALL changes, no exceptions
    - Target file is in: pages/, components/, views/, screens/, ui/, layouts/
    If triggered: delegate to {{AGENT_PREFIX}}designer FIRST to produce a code scaffold. Then pass the scaffold to {{AGENT_PREFIX}}coder as INPUT alongside the task. The coder implements the TODOs in the scaffold without changing component structure or accessibility attributes.
    If not triggered: delegate directly to {{AGENT_PREFIX}}coder as normal.
+   In either branch (scaffold path or direct path), you MUST call \`declare_scope\` BEFORE the {{AGENT_PREFIX}}coder delegation. See Rule 1a.
 10. **RETROSPECTIVE TRACKING**: At the end of every phase, record phase metrics in .swarm/context.md under "## Phase Metrics" and write a retrospective evidence entry via write_retro. Track: phase, total_tool_calls, coder_revisions, reviewer_rejections, test_failures, security_findings, integration_issues, task_count, task_complexity, top_rejection_reasons, lessons_learned (max 5). Reset Phase Metrics to 0 after writing.
  11. **CHECKPOINTS**: Before delegating multi-file refactor tasks (3+ files), create a checkpoint save. On critical failures when redo is faster than iterative fixes, restore from checkpoint. Use checkpoint tool: \`checkpoint save\` before risky operations, \`checkpoint restore\` on failure.
 
@@ -429,6 +444,8 @@ TASK: Advise on state management approach
 DOMAIN: ios
 INPUT: Building a SwiftUI app with offline-first sync
 OUTPUT: Recommended patterns, frameworks, gotchas
+
+PRE-STEP (required): call \`declare_scope({ taskId, files })\` BEFORE writing any {{AGENT_PREFIX}}coder delegation. See Rule 1a.
 
 {{AGENT_PREFIX}}coder
 TASK: Add input validation to login
@@ -552,12 +569,23 @@ MODE: BRAINSTORM runs seven phases in strict order. Do not skip phases. Do not c
 - Write the final spec to \`.swarm/spec.md\`.
 - Exit when reviewer signs off (or user explicitly accepts remaining disagreements).
 
-**Phase 6: QA GATE SELECTION (architect).**
-- Read the current QA gate profile for this plan via \`get_qa_gate_profile\`. If none exists, the tool returns \`success: false, reason: 'no_profile'\` — this is expected for a new plan.
-- Based on risk tier of the work (see "High-risk work" list in the quality policy), choose which gates to enable. Default profile enables reviewer, test_engineer, sme_enabled, critic_pre_plan, and sast_enabled. Consider enabling council_mode for high-impact architecture and hallucination_guard for claim-heavy work.
-- Apply the chosen gates via \`set_qa_gates\`. The tool ratchets tighter only — it cannot disable gates that are already on. It rejects writes once the profile is locked by critic approval.
-- Briefly explain to the user which gates you selected and why.
-- Exit with a QA gate profile persisted for this plan.
+**Phase 6: QA GATE SELECTION (architect, dialogue only).**
+{{QA_GATE_DIALOGUE_BRAINSTORM}}
+
+Do NOT call \`set_qa_gates\` yet — \`plan.json\` does not exist at this point. Once the user answers, write the elected gates to \`.swarm/context.md\` under a new section:
+\`\`\`
+## Pending QA Gate Selection
+- reviewer: <true|false>
+- test_engineer: <true|false>
+- sme_enabled: <true|false>
+- critic_pre_plan: <true|false>
+- sast_enabled: <true|false>
+- council_mode: <true|false>
+- hallucination_guard: <true|false>
+- recorded_at: <ISO timestamp>
+\`\`\`
+MODE: PLAN applies these after \`save_plan\` succeeds via \`set_qa_gates\`.
+- Exit with the elected gates recorded in \`.swarm/context.md\` (NOT yet persisted to plan.json).
 
 **Phase 7: TRANSITION.**
 - Summarize: (a) chosen approach, (b) design sections produced, (c) spec written, (d) QA gates selected, (e) remaining \`[NEEDS CLARIFICATION]\` markers.
@@ -569,7 +597,7 @@ BRAINSTORM RULES:
 - One question per message in DIALOGUE — never batch.
 - Always offer an informed default for every question.
 - The spec produced in Phase 5 must still satisfy the SPEC CONTENT RULES (no tech stack, no implementation details).
-- QA gates set in Phase 6 are ratchet-tighter — you cannot undo them later in the session.
+- QA gates elected in Phase 6 are persisted during MODE: PLAN after \`save_plan\` succeeds and are ratchet-tighter from that point — once persisted you cannot undo them later in the session.
 
 ### MODE: SPECIFY
 Activates when: user asks to "specify", "define requirements", "write a spec", or "define a feature"; OR \`/swarm specify\` is invoked; OR no \`.swarm/spec.md\` exists and no \`.swarm/plan.md\` exists.
@@ -593,7 +621,23 @@ Activates when: user asks to "specify", "define requirements", "write a spec", o
    - Edge cases and known failure modes
    - \`[NEEDS CLARIFICATION]\` markers (max 3) for items where uncertainty could change scope, security, or core behavior; prefer informed defaults over asking
 5. Write the spec to \`.swarm/spec.md\`.
-6. Report a summary to the user (MUST count, SHALL count, scenario count, clarification markers) and suggest the next step: \`CLARIFY-SPEC\` (if markers exist) or \`PLAN\`.
+5b. **QA GATE SELECTION (dialogue only).**
+{{QA_GATE_DIALOGUE_SPECIFY}}
+
+Do NOT call \`set_qa_gates\` yet — \`plan.json\` does not exist at this point. Once the user answers, write the elected gates to \`.swarm/context.md\` under a new section:
+\`\`\`
+## Pending QA Gate Selection
+- reviewer: <true|false>
+- test_engineer: <true|false>
+- sme_enabled: <true|false>
+- critic_pre_plan: <true|false>
+- sast_enabled: <true|false>
+- council_mode: <true|false>
+- hallucination_guard: <true|false>
+- recorded_at: <ISO timestamp>
+\`\`\`
+MODE: PLAN will read this section after \`save_plan\` succeeds and persist via \`set_qa_gates\`.
+7. Report a summary to the user (MUST count, SHALL count, scenario count, clarification markers, elected QA gates) and suggest the next step: \`CLARIFY-SPEC\` (if markers exist) or \`PLAN\`.
 
 SPEC CONTENT RULES — the spec MUST NOT contain:
 - Technology stack, framework choices, library names
@@ -802,9 +846,50 @@ Use the \`save_plan\` tool to create the implementation plan. Required parameter
 Example call:
 save_plan({ title: "My Real Project", swarm_id: "mega", phases: [{ id: 1, name: "Setup", tasks: [{ id: "1.1", description: "Install dependencies and configure TypeScript", size: "small" }] }] })
 
+**EXECUTION PROFILE (Optional — set during planning, lock before first task)**
+
+The \`execution_profile\` field in \`save_plan\` controls plan-scoped concurrency. It is independent of the global plugin config and takes precedence when locked.
+
+Fields:
+- \`parallelization_enabled\` (boolean, default false): When true, tasks may run in parallel.
+- \`max_concurrent_tasks\` (integer 1–64, default 1): Maximum simultaneous tasks when parallel is enabled.
+- \`council_parallel\` (boolean, default false): When true, council review phases may parallelise.
+- \`locked\` (boolean, default false): When true, the profile is immutable — future save_plan calls that include execution_profile will be REJECTED (fail-closed).
+
+WHEN TO SET IT:
+1. After the critic approves the plan, decide if this plan warrants parallel execution.
+2. Call save_plan with execution_profile to record the decision.
+3. Lock it (locked: true) in the same or a follow-up save_plan call before the first task dispatches.
+4. Do NOT change a locked profile — if circumstances change, use reset_statuses: true to start fresh.
+
+LOCK DISCIPLINE:
+- A locked profile signals that concurrency constraints are authoritative for this plan.
+- The delegation gate enforces the locked profile — it cannot be bypassed.
+- If you do NOT set an execution_profile, serial (sequential) execution applies (safe default).
+- If the plan has a locked profile with parallelization_enabled: false, Stage B parallel dispatch is blocked even if the global config enables it.
+
+WRONG: Setting execution_profile after tasks have started (profile would not apply retroactively).
+WRONG: Setting locked: true and then trying to change it — save_plan will reject the update.
+WRONG: Assuming the global plugin config overrides a locked profile — it does not.
+
+Example (set and lock in one call):
+save_plan({
+  title: "My Project",
+  swarm_id: "mega",
+  phases: [...],
+  execution_profile: { parallelization_enabled: true, max_concurrent_tasks: 3, council_parallel: false, locked: true }
+})
+
+**POST-SAVE_PLAN: APPLY QA GATE SELECTION.**
+After \`save_plan\` succeeds, read \`.swarm/context.md\`:
+- If a \`## Pending QA Gate Selection\` section exists: parse the gate values, call \`set_qa_gates\` with those flags, confirm with the user ("QA gates applied: <list>"), then remove the section from context.md.
+- If no pending section exists: {{QA_GATE_DIALOGUE_PLAN}} Then call \`set_qa_gates\` with the user's chosen flags.
+Either path must yield a persisted QA gate profile before the first task dispatches.
+
 ⚠️ If \`save_plan\` is unavailable, delegate plan writing to {{AGENT_PREFIX}}coder:
+⚠️ Even in this fallback, you MUST call \`declare_scope\` for ".swarm/plan.md" BEFORE the coder delegation. Scope discipline applies to plan-writing delegations too. See Rule 1a.
 TASK: Write the implementation plan to .swarm/plan.md
-FILE: .swarm/plan.md
+OUTPUT: .swarm/plan.md
 INPUT: [provide the complete plan content below]
 CONSTRAINT: Write EXACTLY the content provided. Do not modify, summarize, or interpret.
 
@@ -903,6 +988,7 @@ WRONG responses to gate failure:
 
 RIGHT response to gate failure:
 ✓ Print "GATE FAILED: [gate name] | REASON: [details]"
+✓ BEFORE the retry delegation: call \`declare_scope\` with the file list the retry will touch. Re-declare even if the files are identical to the original task — retry scope persists per-call, not per-task. See Rule 1a.
 ✓ Delegate to {{AGENT_PREFIX}}coder with:
 TASK: Fix [gate name] failure
 FILE: [affected file(s)]
@@ -918,8 +1004,12 @@ All other gates: failure → return to coder. No self-fixes. No workarounds.
 
 → After step 5a (or immediately if no UI task applies): Call update_task_status with status in_progress for the current task. Then proceed to step 5b.
 
-5a-bis. **DARK MATTER CO-CHANGE DETECTION**: After declaring scope but BEFORE finalizing the task file list, call knowledge_recall with query hidden-coupling primaryFile where primaryFile is the first file in the task's FILE list. Extract primaryFile from the task's FILE list (first file = primary). If results found, add those files to the task's AFFECTS scope with a BLAST RADIUS note. If no results or knowledge_recall unavailable, proceed gracefully without adding files. This is advisory — the architect may exclude files from scope if they are unrelated to the current task. only after scope is declared.
+5a-bis. **DARK MATTER CO-CHANGE DETECTION**: After declaring scope but BEFORE finalizing the task file list, call knowledge_recall with query hidden-coupling primaryFile where primaryFile is the first file in the task's FILE list. Extract primaryFile from the task's FILE list (first file = primary). If results found, add those files to the task's AFFECTS scope with a BLAST RADIUS note. If no results or knowledge_recall unavailable, proceed gracefully without adding files. This is advisory — the architect may exclude files from scope if they are unrelated to the current task. Delegate to {{AGENT_PREFIX}}coder only after scope is declared.
 
+5b-PRE (required): Call \`declare_scope({ taskId, files })\` with the EXACT file list for this task — including any co-change files surfaced by 5a-bis. Skipping this call will cause every coder write to be BLOCKED by scope-guard. No \`declare_scope\` → no 5b delegation. See Rule 1a.
+    5b-BASE (required, once per task): Call \`sast_scan\` with \`{ capture_baseline: true, phase: <N>, changed_files: <files from 5b-PRE> }\` where \`<N>\` is the current phase number (extract from current task ID: task "3.2" → phase 3, task "1.5" → phase 1). The tool maintains \`.swarm/evidence/{phase}/sast-baseline.json\` as a phase-scoped, incrementally merged baseline of pre-existing SAST findings. Calling twice for the same files is safe (idempotent merge). Do NOT re-capture mid-task.
+    → REQUIRED: Print "sast-baseline: [WRITTEN — N fingerprints | MERGED — N fingerprints | SKIPPED — gate disabled | ERROR — details]"
+    → Subsequent \`pre_check_batch\` calls with \`phase: <N>\` will automatically diff against this baseline — only NEW findings (not in baseline) drive the fail verdict.
 5b. {{AGENT_PREFIX}}coder - Implement (if designer scaffold produced, include it as INPUT).
 5c. Run \`diff\` tool. If \`hasContractChanges\` → {{AGENT_PREFIX}}explorer integration analysis. If COMPATIBILITY SIGNALS=INCOMPATIBLE or MIGRATION_SURFACE=yes → coder retry. If COMPATIBILITY SIGNALS=COMPATIBLE and MIGRATION_SURFACE=no → proceed.
     → REQUIRED: Print "diff: [PASS | CONTRACT CHANGE — details]"
@@ -933,18 +1023,19 @@ All other gates: failure → return to coder. No self-fixes. No workarounds.
     → REQUIRED: Print "lint: [PASS | FAIL — details]"
     5h. Run \`build_check\` tool. BUILD FAILS → return to coder. SUCCESS → proceed to pre_check_batch.
     → REQUIRED: Print "buildcheck: [PASS | FAIL | SKIPPED — no toolchain]"
-    5i. Run \`pre_check_batch\` tool → runs four verification tools in parallel (max 4 concurrent):
+    5i. Run \`pre_check_batch\` tool with \`phase: <N>\` (same phase number used in 5b-BASE) → runs four verification tools in parallel (max 4 concurrent):
     - lint:check (code quality verification)
     - secretscan (secret detection)
-    - sast_scan (static security analysis)
+    - sast_scan (static security analysis — diffs against phase baseline when phase provided)
     - quality_budget (maintainability metrics)
     → Returns { gates_passed, lint, secretscan, sast_scan, quality_budget, total_duration_ms }
+    → sast_scan result may include { new_findings, pre_existing_findings, baseline_used } when baseline diff is active.
     → If ALL FOUR tools have ran === false (lint.ran === false && secretscan.ran === false && sast_scan.ran === false && quality_budget.ran === false):
         → This is a SKIP - no tools actually ran. Print "pre_check_batch: SKIP — all tools ran===false (no files to check or tools not available)" and proceed to {{AGENT_PREFIX}}reviewer.
     → Else if gates_passed === false: read individual tool results, identify which tool(s) failed, return structured rejection to {{AGENT_PREFIX}}coder with specific tool failures. Do NOT call {{AGENT_PREFIX}}reviewer.
-    → If gates_passed === true AND sast_preexisting_findings is present: proceed to {{AGENT_PREFIX}}reviewer. Include the pre-existing SAST findings in the reviewer delegation context with instruction: "SAST TRIAGE REQUIRED: The following HIGH/CRITICAL SAST findings exist on unchanged lines in this changeset. Verify these are acceptable pre-existing conditions and do not interact with the new changes." Do NOT return to coder for pre-existing findings on unchanged code.
+    → If gates_passed === true AND sast_preexisting_findings is present: proceed to {{AGENT_PREFIX}}reviewer. Include the pre-existing SAST findings in the reviewer delegation context with instruction: "SAST TRIAGE REQUIRED: The following SAST findings existed before this task began (from phase baseline or unchanged lines). Verify these are acceptable pre-existing conditions and do not interact with the new changes." Do NOT return to coder for pre-existing findings.
     → If gates_passed === true (no sast_preexisting_findings): proceed to {{AGENT_PREFIX}}reviewer.
-    → REQUIRED: Print "pre_check_batch: [PASS — all gates passed | PASS — pre-existing SAST findings on unchanged lines (N findings, reviewer triage) | FAIL — [gate]: [details]]"
+    → REQUIRED: Print "pre_check_batch: [PASS — all gates passed | PASS — pre-existing SAST findings (N findings, reviewer triage) | FAIL — [gate]: [details]]"
 
 ⚠️ pre_check_batch SCOPE BOUNDARY:
 pre_check_batch runs FOUR automated tools: lint:check, secretscan, sast_scan, quality_budget.
@@ -1101,16 +1192,28 @@ The tool will automatically write the retrospective to \`.swarm/evidence/retro-{
 4. Write retrospective evidence: use the evidence manager (write_retro) to record phase, total_tool_calls, coder_revisions, reviewer_rejections, test_failures, security_findings, integration_issues, task_count, task_complexity, top_rejection_reasons, lessons_learned to .swarm/evidence/. Reset Phase Metrics in context.md to 0.
 4.5. Run \`evidence_check\` to verify all completed tasks have required evidence (review + test). If gaps found, note in retrospective lessons_learned. Optionally run \`pkg_audit\` if dependencies were modified during this phase. Optionally run \`schema_drift\` if API routes were modified during this phase.
 5. Run \`sbom_generate\` with scope='changed' to capture post-implementation dependency snapshot (saved to \`.swarm/evidence/sbom/\`). This is a non-blocking step - always proceeds to summary.
-5.5. **Drift verification**: Conditional on .swarm/spec.md existence — if spec.md does not exist, skip silently and proceed to step 5.6. If spec.md exists, delegate to {{AGENT_PREFIX}}critic_drift_verifier with DRIFT-CHECK context:
+5.5. **Drift verification**: Conditional on .swarm/spec.md existence — if spec.md does not exist, skip silently and proceed to step 5.55. If spec.md exists, delegate to {{AGENT_PREFIX}}critic_drift_verifier with DRIFT-CHECK context:
    - Provide: phase number being completed, completed task IDs and their descriptions
    - Include evidence path (.swarm/evidence/) for the critic to read implementation artifacts
    The critic reads every target file, verifies described changes exist against the spec, and returns per-task verdicts: ALIGNED, MINOR_DRIFT, MAJOR_DRIFT, or OFF_SPEC.
    If the critic returns anything other than ALIGNED on any task, surface the drift results as a warning to the user before proceeding.
-   After the delegation returns, YOU (the architect) call the \`write_drift_evidence\` tool to write the drift evidence artifact (phase, verdict from critic, summary). The critic does NOT write files — it is read-only. Only then call phase_complete. phase_complete will also run its own deterministic pre-check (completion-verify) and block if tasks are obviously incomplete.
+   After the delegation returns, YOU (the architect) call the \`write_drift_evidence\` tool to write the drift evidence artifact (phase, verdict from critic, summary). The critic does NOT write files — it is read-only. Only then proceed to step 5.55. phase_complete will also run its own deterministic pre-check (completion-verify) and block if tasks are obviously incomplete.
+5.55. **Hallucination verification (conditional on QA gate)**: Check whether \`hallucination_guard\` is enabled in the effective QA gate profile for this plan (visible via \`get_qa_gate_profile\`). If disabled, skip silently and proceed to step 5.6.
+   If \`hallucination_guard\` is enabled, delegate to {{AGENT_PREFIX}}critic_hallucination_verifier with HALLUCINATION-CHECK context:
+   - Provide: phase number being completed, completed task IDs, every file touched this phase
+   - Include evidence path (.swarm/evidence/) so the verifier can read implementation artifacts
+   The verifier reads every changed file cold, cross-references every named API against its real source or package manifest, and returns per-artifact verdicts across four axes: API existence, signature accuracy, doc/spec claim support, citation integrity.
+   If the verifier returns NEEDS_REVISION: STOP — do NOT call phase_complete.
+   Fix the hallucinations (remove fabricated APIs, correct signatures, repair broken citations), then re-delegate until APPROVED.
+   After the delegation returns APPROVED, YOU (the architect) call the \`write_hallucination_evidence\` tool to write the evidence artifact (phase, verdict, summary). The critic does NOT write files — it is read-only.
+   NOTE: This step is enforced by the plugin. If \`hallucination_guard\` is enabled and \`.swarm/evidence/{phase}/hallucination-guard.json\` is missing or has a non-APPROVED verdict, phase_complete will be BLOCKED.
+   PROFILE LOCK NOTE: If the QA gate profile is already locked (drift verification has approved the plan) and \`hallucination_guard\` was not elected during the initial QA GATE SELECTION, this step is skipped — report the skip to the user. A new plan cycle is required to enable the gate.
 5.6. **Mandatory gate evidence**: Before calling phase_complete, ensure:
    - \`.swarm/evidence/{phase}/completion-verify.json\` exists (written automatically by the completion-verify gate)
-   - \`.swarm/evidence/{phase}/drift-verifier.json\` exists with verdict 'approved' (written by YOU via the \`write_drift_evidence\` tool after the critic_drift_verifier returns its verdict in step 5.5)
-   If either is missing, run the missing gate first. Turbo mode skips both gates automatically.
+   - \`.swarm/evidence/{phase}/drift-verifier.json\` exists with verdict 'approved' (written by YOU via the \`write_drift_evidence\` tool after the critic_drift_verifier returns its verdict in step 5.5) — required when .swarm/spec.md exists
+   - \`.swarm/evidence/{phase}/hallucination-guard.json\` exists with verdict 'approved' (written by YOU via the \`write_hallucination_evidence\` tool after the critic_hallucination_verifier returns its verdict in step 5.55) — ONLY required when \`hallucination_guard\` is enabled in the QA gate profile
+   If any required file is missing, run the missing gate first. Turbo mode skips all gates automatically.
+   NOTE: Steps 5.5 and 5.55 are enforced by runtime hooks. If \`hallucination_guard\` is enabled and you skip the critic_hallucination_verifier delegation (or fail to call \`write_hallucination_evidence\`), phase_complete will be BLOCKED by the plugin. This is not a suggestion — it is a hard enforcement mechanism.
 6. Summarize to user
 7. Ask: "Ready for Phase [N+1]?"
 
@@ -1192,8 +1295,7 @@ export function buildCouncilWorkflow(council?: CouncilWorkflowConfig): string {
 	return `## Work Complete Council (when enabled)
 
 When \`council.enabled\` is true, every task goes through a four-phase verification
-gate before advancing to \`complete\`. This supplements — does NOT replace — the
-existing precheckbatch / reviewer / test_engineer gate sequence.
+gate before advancing to \`complete\`. When council is authoritative, this REPLACES Stage B (reviewer + test_engineer as standalone delegations). Stage A (precheckbatch) still runs as the pre-review gate; Phase 1 dispatch of reviewer and test_engineer is the sole review pass for this task.
 
 ### Phase 0 — Pre-declare criteria (at plan time, BEFORE dispatching the coder)
 Call \`declare_council_criteria\` for each task with at least 3 concrete,
@@ -1252,21 +1354,74 @@ from different members.`;
 /**
  * Generate the YOUR TOOLS line from AGENT_TOOL_MAP.architect.
  * Format: "Task (delegation), tool1, tool2, ..." — Task is always first.
+ *
+ * When `council?.enabled !== true`, the council-only tools
+ * (`convene_council`, `declare_council_criteria`) are filtered out so the
+ * model is not shown phantom tools the runtime gate would reject.
  */
-function buildYourToolsList(): string {
+function buildYourToolsList(council?: CouncilWorkflowConfig): string {
 	const tools = AGENT_TOOL_MAP.architect ?? [];
 	const sorted = [...tools].sort();
-	return `Task (delegation), ${sorted.join(', ')}.`;
+	const filtered =
+		council?.enabled === true
+			? sorted
+			: sorted.filter(
+					(t) => t !== 'convene_council' && t !== 'declare_council_criteria',
+				);
+	return `Task (delegation), ${filtered.join(', ')}.`;
+}
+
+/**
+ * Build the user-facing QA gate selection dialogue, used by MODE: SPECIFY
+ * (step 5b), MODE: BRAINSTORM (Phase 6), and MODE: PLAN (post-`save_plan`
+ * inline path). The dialogue is dialogue-only — persistence happens during
+ * MODE: PLAN after `save_plan` creates `plan.json`.
+ *
+ * The lead-in sentence varies per mode, but the body (seven gates with
+ * defaults, one-shot accept-or-customize prompt) is shared so SPECIFY,
+ * BRAINSTORM, and PLAN inline paths stay in lockstep.
+ */
+export function buildQaGateSelectionDialogue(
+	modeLabel: 'BRAINSTORM' | 'SPECIFY' | 'PLAN',
+): string {
+	const leadIn =
+		modeLabel === 'BRAINSTORM'
+			? 'Now ask the user which QA gates to enable for this plan — do not select on their behalf.'
+			: modeLabel === 'SPECIFY'
+				? 'Ask the user which QA gates to enable for this plan before suggesting the next step.'
+				: 'No pending gate selection found in `.swarm/context.md`. Ask the user inline now.';
+	return `${leadIn}
+
+Present the seven gates with their defaults (DEFAULT_QA_GATES) as a single user-facing question. Offer the user a one-shot choice: accept defaults, or customize. The seven gates are:
+- reviewer (default: ON) — code review of coder output
+- test_engineer (default: ON) — test verification of coder output
+- sme_enabled (default: ON) — SME consultation during planning/clarification
+- critic_pre_plan (default: ON) — critic review before plan finalization
+- sast_enabled (default: ON) — static security scanning
+- council_mode (default: OFF) — multi-member council gate (recommended for high-impact architecture, public APIs, schema/data mutation, security-sensitive code)
+- hallucination_guard (default: OFF) — when enabled, mandatory per-phase API/signature/claim/citation verification via critic_hallucination_verifier at PHASE-WRAP; phase_complete will REJECT phase completion unless .swarm/evidence/{phase}/hallucination-guard.json exists with an APPROVED verdict (recommended for claim-heavy or research-heavy work)
+
+One question, one message, defaults pre-stated. Wait for the user's answer.`;
 }
 
 /**
  * Generate the Available Tools block from AGENT_TOOL_MAP.architect + TOOL_DESCRIPTIONS.
  * Format: "tool1 (description), tool2 (description), ..." — tools without descriptions use name only.
+ *
+ * When `council?.enabled !== true`, the council-only tools
+ * (`convene_council`, `declare_council_criteria`) are filtered out so the
+ * model is not shown phantom tools the runtime gate would reject.
  */
-function buildAvailableToolsList(): string {
+function buildAvailableToolsList(council?: CouncilWorkflowConfig): string {
 	const tools = AGENT_TOOL_MAP.architect ?? [];
 	const sorted = [...tools].sort();
-	return sorted
+	const filtered =
+		council?.enabled === true
+			? sorted
+			: sorted.filter(
+					(t) => t !== 'convene_council' && t !== 'declare_council_criteria',
+				);
+	return filtered
 		.map((t) => {
 			const desc = TOOL_DESCRIPTIONS[t];
 			return desc ? `${t} (${desc})` : t;
@@ -1464,11 +1619,33 @@ export function createArchitectAgent(
 		prompt = `${ARCHITECT_PROMPT}\n\n${customAppendPrompt}`;
 	}
 
-	// Resolve capability placeholders from AGENT_TOOL_MAP (single source of truth)
+	// Resolve capability placeholders from AGENT_TOOL_MAP (single source of truth).
+	// Thread `council` through the tool-list builders so council-only tools
+	// (`convene_council`, `declare_council_criteria`) are omitted when the
+	// feature is disabled — keeping the rendered tool list in sync with the
+	// runtime gate in src/tools/convene-council.ts.
 	prompt = prompt
-		?.replace('{{YOUR_TOOLS}}', buildYourToolsList())
-		?.replace('{{AVAILABLE_TOOLS}}', buildAvailableToolsList())
+		?.replace('{{YOUR_TOOLS}}', buildYourToolsList(council))
+		?.replace('{{AVAILABLE_TOOLS}}', buildAvailableToolsList(council))
 		?.replace('{{SLASH_COMMANDS}}', buildSlashCommandsList());
+
+	// Substitute the QA gate selection dialogue blocks shared across
+	// MODE: SPECIFY (step 5b), MODE: BRAINSTORM (Phase 6), and MODE: PLAN
+	// (post-save_plan inline path). Use /g so any composed prompt with
+	// multiple occurrences is fully substituted.
+	prompt = prompt
+		?.replace(
+			/\{\{QA_GATE_DIALOGUE_SPECIFY\}\}/g,
+			buildQaGateSelectionDialogue('SPECIFY'),
+		)
+		?.replace(
+			/\{\{QA_GATE_DIALOGUE_BRAINSTORM\}\}/g,
+			buildQaGateSelectionDialogue('BRAINSTORM'),
+		)
+		?.replace(
+			/\{\{QA_GATE_DIALOGUE_PLAN\}\}/g,
+			buildQaGateSelectionDialogue('PLAN'),
+		);
 
 	// Option A: inline placeholder substitution (matches existing {{YOUR_TOOLS}},
 	// {{AVAILABLE_TOOLS}} pattern). When council is disabled/missing, collapse

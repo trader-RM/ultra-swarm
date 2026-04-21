@@ -92,4 +92,4 @@ describe('curator ECC Delegation Exposure', () => {
     it('explicitly states CAN delegate to approved ECC specialist agents for CURATOR_PHASE', () => {
         expect(CURATOR_PHASE_PROMPT).toContain('CAN delegate to approved ECC specialist agents');
     });
-});
+});

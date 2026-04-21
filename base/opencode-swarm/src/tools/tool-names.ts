@@ -6,6 +6,7 @@
 /** Union type of all valid tool names */
 export type ToolName =
 	| 'diff'
+	| 'diff_summary'
 	| 'syntax_check'
 	| 'placeholder_scan'
 	| 'imports'
@@ -28,6 +29,8 @@ export type ToolName =
 	| 'checkpoint'
 	| 'pkg_audit'
 	| 'test_runner'
+	| 'test_impact'
+	| 'mutation_test'
 	| 'detect_domains'
 	| 'gitingest'
 	| 'retrieve_summary'
@@ -38,6 +41,7 @@ export type ToolName =
 	| 'lint_spec'
 	| 'write_retro'
 	| 'write_drift_evidence'
+	| 'write_hallucination_evidence'
 	| 'declare_scope'
 	| 'knowledge_query'
 	| 'doc_scan'
@@ -59,6 +63,7 @@ export type ToolName =
 /** Readonly array of all tool names */
 export const TOOL_NAMES: readonly ToolName[] = [
 	'diff',
+	'diff_summary',
 	'syntax_check',
 	'placeholder_scan',
 	'imports',
@@ -81,6 +86,8 @@ export const TOOL_NAMES: readonly ToolName[] = [
 	'checkpoint',
 	'pkg_audit',
 	'test_runner',
+	'test_impact',
+	'mutation_test',
 	'detect_domains',
 	'gitingest',
 	'retrieve_summary',
@@ -91,6 +98,7 @@ export const TOOL_NAMES: readonly ToolName[] = [
 	'lint_spec',
 	'write_retro',
 	'write_drift_evidence',
+	'write_hallucination_evidence',
 	'declare_scope',
 	'knowledge_query',
 	'doc_scan',

@@ -16,7 +16,6 @@ import {
 	createCriticAutonomousOversightAgent,
 } from './critic';
 import { type CuratorRole, createCuratorAgent } from './curator-agent';
-import { createDesignerAgent } from './designer';
 import { createDocsAgent } from './docs';
 import { createExplorerAgent } from './explorer';
 import { createReviewerAgent } from './reviewer';
@@ -172,8 +171,6 @@ function applyOverrides(
 	}
 	return agent;
 }
-
-
 
 /**
  * Create agents for a single swarm
@@ -334,6 +331,20 @@ If you call @coder instead of @${swarmId}_coder, the call will FAIL or go to the
 		agents.push(applyOverrides(critic, swarmAgents, swarmPrefix));
 	}
 
+	// 5c-bis. Create Critic Hallucination Verifier
+	if (
+		!isAgentDisabled('critic_hallucination_verifier', swarmAgents, swarmPrefix)
+	) {
+		const critic = createCriticAgent(
+			swarmAgents?.critic_hallucination_verifier?.model ?? getModel('critic'),
+			undefined,
+			undefined,
+			'hallucination_verifier' as CriticRole,
+		);
+		critic.name = prefixName('critic_hallucination_verifier');
+		agents.push(applyOverrides(critic, swarmAgents, swarmPrefix));
+	}
+
 	// 5d. Create Critic Autonomous Oversight
 	if (!isAgentDisabled('critic_oversight', swarmAgents, swarmPrefix)) {
 		const critic = createCriticAutonomousOversightAgent(
@@ -391,22 +402,6 @@ If you call @coder instead of @${swarmId}_coder, the call will FAIL or go to the
 		docs.name = prefixName('docs');
 		agents.push(applyOverrides(docs, swarmAgents, swarmPrefix));
 	}
-
-	// 9. Create Designer agent (opt-in — only when ui_review.enabled === true)
-	if (
-		pluginConfig?.ui_review?.enabled === true &&
-		!isAgentDisabled('designer', swarmAgents, swarmPrefix)
-	) {
-		const designerPrompts = getPrompts('designer');
-		const designer = createDesignerAgent(
-			getModel('designer'),
-			designerPrompts.prompt,
-			designerPrompts.appendPrompt,
-		);
-		designer.name = prefixName('designer');
-		agents.push(applyOverrides(designer, swarmAgents, swarmPrefix));
-	}
-
 
 	return agents;
 }
@@ -580,6 +575,26 @@ export function getAgentConfigs(
 				}
 			}
 
+			// Symmetric validation: when council is OFF but the user override
+			// INCLUDES the council tools, the runtime gate in
+			// src/tools/convene-council.ts will reject any model attempt to call
+			// them. Warn so the user knows the tools are present in the override
+			// but unusable at runtime.
+			if (
+				baseAgentName === 'architect' &&
+				config?.council?.enabled !== true &&
+				override !== undefined
+			) {
+				const councilTools = ['declare_council_criteria', 'convene_council'];
+				const present = councilTools.filter((t) => override.includes(t));
+				if (present.length > 0) {
+					console.warn(
+						`[opencode-swarm] tool_filter.overrides.architect includes ${present.join(', ')} but council.enabled is not true. ` +
+							`The runtime gate will reject these calls. Either set council.enabled=true, or remove ${present.join(', ')} from the architect override.`,
+					);
+				}
+			}
+
 			// Warn once when base name lacks a whitelist entry (no override and no AGENT_TOOL_MAP)
 			if (!allowedTools && !Object.hasOwn(toolFilterOverrides, baseAgentName)) {
 				if (!warnedMissingWhitelist.has(baseAgentName)) {
@@ -650,11 +665,22 @@ export function getAgentConfigs(
 // Re-export agent types
 export { createArchitectAgent } from './architect';
 export { CODER_PROMPT, createCoderAgent } from './coder';
-export { createCriticAgent } from './critic';
+// Re-export Critic prompts for testing
+export {
+	AUTONOMOUS_OVERSIGHT_PROMPT,
+	type CriticRole,
+	createCriticAgent,
+	PHASE_DRIFT_VERIFIER_PROMPT,
+	PLAN_CRITIC_PROMPT,
+	parseSoundingBoardResponse,
+	SOUNDING_BOARD_PROMPT,
+	type SoundingBoardResponse,
+	type SoundingBoardVerdict,
+} from './critic';
 export { createCuratorAgent } from './curator-agent';
 export { createDesignerAgent } from './designer';
 export { createDocsAgent, DOCS_PROMPT } from './docs';
-export { EXPLORER_PROMPT, createExplorerAgent } from './explorer';
+export { createExplorerAgent, EXPLORER_PROMPT } from './explorer';
 export {
 	createReviewerAgent,
 	REVIEWER_PROMPT,
@@ -663,14 +689,3 @@ export {
 } from './reviewer';
 export { createSMEAgent } from './sme';
 export { createTestEngineerAgent } from './test-engineer';
-// Re-export Critic prompts for testing
-export {
-  PLAN_CRITIC_PROMPT,
-  SOUNDING_BOARD_PROMPT,
-  PHASE_DRIFT_VERIFIER_PROMPT,
-  AUTONOMOUS_OVERSIGHT_PROMPT,
-  type CriticRole,
-  type SoundingBoardVerdict,
-  type SoundingBoardResponse,
-  parseSoundingBoardResponse,
-} from './critic';

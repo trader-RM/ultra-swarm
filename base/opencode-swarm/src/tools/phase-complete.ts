@@ -16,6 +16,7 @@ import {
 	PhaseCompleteConfigSchema,
 	stripKnownSwarmPrefix,
 } from '../config/schema';
+import { getEffectiveGates, getProfile } from '../db/qa-gate-profile.js';
 import { listEvidenceTaskIds, loadEvidence } from '../evidence/manager';
 import {
 	applyCuratorKnowledgeUpdates,
@@ -24,7 +25,16 @@ import {
 import { createCuratorLLMDelegate } from '../hooks/curator-llm-factory.js';
 import { curateAndStoreSwarm } from '../hooks/knowledge-curator.js';
 import { updateRetrievalOutcome } from '../hooks/knowledge-reader.js';
-import type { KnowledgeConfig } from '../hooks/knowledge-types.js';
+import {
+	resolveHiveKnowledgePath,
+	resolveSwarmKnowledgePath,
+	sweepAgedEntries,
+	sweepStaleTodos,
+} from '../hooks/knowledge-store.js';
+import type {
+	KnowledgeConfig,
+	KnowledgeEntryBase,
+} from '../hooks/knowledge-types.js';
 import {
 	buildApprovedReceipt,
 	buildRejectedReceipt,
@@ -477,11 +487,11 @@ export async function executePhaseComplete(
 		);
 	}
 
-	// Turbo mode: skip both completion-verify and drift-verifier gates
+	// Turbo mode: skip completion-verify, drift-verifier, and hallucination-guard gates
 	if (hasActiveTurboMode(sessionID)) {
 		// Non-blocking warning so architect knows gates were bypassed
 		console.warn(
-			`[phase_complete] Turbo mode active — skipping completion-verify and drift-verifier gates for phase ${phase}`,
+			`[phase_complete] Turbo mode active — skipping completion-verify, drift-verifier, and hallucination-guard gates for phase ${phase}`,
 		);
 	} else {
 		// Gate 1: Completion Verify (deterministic, in-process)
@@ -662,13 +672,134 @@ export async function executePhaseComplete(
 				driftError,
 			);
 		}
+
+		// Gate 3: Hallucination Guard (conditional on QA gate flag)
+		try {
+			const plan = await loadPlan(dir);
+			if (plan) {
+				const planId = `${plan.swarm}-${plan.title}`.replace(
+					/[^a-zA-Z0-9-_]/g,
+					'_',
+				);
+				const profile = getProfile(dir, planId);
+				if (profile) {
+					const session = sessionID
+						? swarmState.agentSessions.get(sessionID)
+						: undefined;
+					const overrides = session?.qaGateSessionOverrides ?? {};
+					const effective = getEffectiveGates(profile, overrides);
+
+					if (effective.hallucination_guard === true) {
+						const hgPath = path.join(
+							dir,
+							'.swarm',
+							'evidence',
+							String(phase),
+							'hallucination-guard.json',
+						);
+						let hgVerdictFound = false;
+						let hgVerdictApproved = false;
+
+						try {
+							const hgContent = fs.readFileSync(hgPath, 'utf-8');
+							const hgBundle = JSON.parse(hgContent);
+							for (const entry of hgBundle.entries ?? []) {
+								if (
+									typeof entry.type === 'string' &&
+									entry.type.includes('hallucination') &&
+									typeof entry.verdict === 'string'
+								) {
+									hgVerdictFound = true;
+									if (entry.verdict === 'approved') {
+										hgVerdictApproved = true;
+									}
+									if (
+										entry.verdict === 'rejected' ||
+										(typeof entry.summary === 'string' &&
+											entry.summary.includes('NEEDS_REVISION'))
+									) {
+										return JSON.stringify(
+											{
+												success: false,
+												phase,
+												status: 'blocked' as const,
+												reason: 'HALLUCINATION_VERIFICATION_REJECTED',
+												message: `Phase ${phase} cannot be completed: hallucination verifier returned verdict '${entry.verdict}'. Remove fabricated APIs/signatures and fix broken citations before completing the phase.`,
+												agentsDispatched,
+												agentsMissing: [],
+												warnings: [],
+											},
+											null,
+											2,
+										);
+									}
+								}
+							}
+						} catch (readErr) {
+							if ((readErr as NodeJS.ErrnoException).code !== 'ENOENT') {
+								safeWarn(
+									`[phase_complete] Hallucination guard evidence unreadable:`,
+									readErr,
+								);
+							}
+							hgVerdictFound = false;
+						}
+
+						if (!hgVerdictFound) {
+							return JSON.stringify(
+								{
+									success: false,
+									phase,
+									status: 'blocked' as const,
+									reason: 'HALLUCINATION_VERIFICATION_MISSING',
+									message: `Phase ${phase} cannot be completed: hallucination_guard is enabled and evidence not found at .swarm/evidence/${phase}/hallucination-guard.json. Delegate to critic_hallucination_verifier and call write_hallucination_evidence before completing the phase.`,
+									agentsDispatched,
+									agentsMissing: [],
+									warnings: [],
+								},
+								null,
+								2,
+							);
+						}
+
+						if (!hgVerdictApproved) {
+							return JSON.stringify(
+								{
+									success: false,
+									phase,
+									status: 'blocked' as const,
+									reason: 'HALLUCINATION_VERIFICATION_REJECTED',
+									message: `Phase ${phase} cannot be completed: hallucination verifier verdict is not approved.`,
+									agentsDispatched,
+									agentsMissing: [],
+									warnings: [],
+								},
+								null,
+								2,
+							);
+						}
+					}
+				}
+			}
+		} catch (hgError) {
+			// Non-blocking — treat as warning and continue
+			safeWarn(
+				`[phase_complete] Hallucination guard error (non-blocking):`,
+				hgError,
+			);
+		}
 	}
 
 	// Knowledge config: load from plugin config so user overrides are respected.
 	// Falls back to schema defaults if config is absent or partially specified.
-	const knowledgeConfig: KnowledgeConfig = KnowledgeConfigSchema.parse(
-		config.knowledge ?? {},
-	);
+	// Degrade gracefully on malformed user config — sweep is non-blocking.
+	let knowledgeConfig: KnowledgeConfig;
+	try {
+		knowledgeConfig = KnowledgeConfigSchema.parse(config.knowledge ?? {});
+	} catch (parseErr) {
+		warnings.push(`Knowledge config validation failed: ${String(parseErr)}`);
+		knowledgeConfig = KnowledgeConfigSchema.parse({});
+	}
 
 	// Extract and store lessons from retrospective to knowledge.jsonl
 	if (
@@ -1062,6 +1193,52 @@ export async function executePhaseComplete(
 				contributorSession.lastPhaseCompletePhase = phase;
 				telemetry.phaseChanged(contributorSessionId, oldPhase ?? 0, phase);
 			}
+		}
+
+		// Knowledge decay sweep: runs on EVERY successful phase completion.
+		// Note: sweep fires regardless of drift-verifier (when no spec.md exists,
+		// drift is advisory-only and sweep still runs). Reuses the knowledgeConfig
+		// parsed earlier in this tool (see above near line 675).
+		try {
+			if (knowledgeConfig.sweep_enabled) {
+				const swarmPath = resolveSwarmKnowledgePath(dir);
+				await sweepAgedEntries<KnowledgeEntryBase>(
+					swarmPath,
+					knowledgeConfig.default_max_phases,
+				);
+				await sweepStaleTodos<KnowledgeEntryBase>(
+					swarmPath,
+					knowledgeConfig.todo_max_phases,
+				);
+
+				// Hive sweep. Directory lock in both sweep functions prevents concurrent
+				// appends from racing. Non-promoted hive entries may age N× faster under
+				// N concurrent projects, but this is acceptable: (a) hive entries are
+				// 100% promoted by design (hive-promoter.ts:436/511), and (b) non-promoted
+				// entries should age out anyway.
+				if (knowledgeConfig.hive_enabled) {
+					const hivePath = resolveHiveKnowledgePath();
+					await sweepAgedEntries<KnowledgeEntryBase>(
+						hivePath,
+						knowledgeConfig.default_max_phases,
+					);
+					await sweepStaleTodos<KnowledgeEntryBase>(
+						hivePath,
+						knowledgeConfig.todo_max_phases,
+					);
+				}
+			}
+		} catch (err) {
+			// Never block phase completion on a sweep failure. Log and continue.
+			let detail = String(err);
+			if (detail.includes('ELOCKED')) {
+				detail = 'lock timeout (stale lock detected)';
+			} else if (detail.includes('ENOSPC')) {
+				detail = 'disk full';
+			} else if (detail.includes('EACCES')) {
+				detail = 'permission denied';
+			}
+			warnings.push(`Knowledge sweep failed for phase ${phase}: ${detail}`);
 		}
 
 		// Update plan.json phase status to complete via ledger-first savePlan

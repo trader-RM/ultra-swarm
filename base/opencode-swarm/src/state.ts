@@ -13,13 +13,18 @@ import type { OpencodeClient } from '@opencode-ai/sdk';
 import { ORCHESTRATOR_NAME } from './config/constants';
 import { type Plan, PlanSchema, type TaskStatus } from './config/plan-schema';
 import { stripKnownSwarmPrefix } from './config/schema';
-import type { QaGates } from './db/qa-gate-profile.js';
+import { getProfile, type QaGates } from './db/qa-gate-profile.js';
 import {
 	detectEnvironmentProfile,
 	type EnvironmentProfile,
 } from './environment/profile.js';
 import type { TaskEvidence } from './gate-evidence';
+import { clearPendingCoderScope } from './hooks/delegation-gate.js';
+import { loadPlanJsonOnly } from './plan/manager.js';
+import { AgentRunContext } from './state/agent-run-context.js';
 import { telemetry } from './telemetry.js';
+
+export { AgentRunContext } from './state/agent-run-context.js';
 
 /**
  * Cached plan + evidence data read once at plugin init by buildRehydrationCache().
@@ -31,6 +36,12 @@ interface RehydrationCache {
 	evidenceMap: Map<string, TaskEvidence>;
 }
 let _rehydrationCache: RehydrationCache | null = null;
+
+/**
+ * Tracks plan IDs that have already received the "council disagreement" warn.
+ * One warning per plan_id, per process lifetime. Cleared by resetSwarmState.
+ */
+const _councilDisagreementWarned = new Set<string>();
 
 /**
  * Represents a single tool call entry for tracking purposes
@@ -146,6 +157,18 @@ export interface AgentSessionState {
 	// v6.21 Per-task state machine
 	/** Per-task workflow state — taskId → current state */
 	taskWorkflowStates: Map<string, TaskWorkflowState>;
+	/**
+	 * PR 2 Stage B barrier: per-task set of completed Stage B agents.
+	 * Order-independent — either 'reviewer' or 'test_engineer' may complete first.
+	 * When both are present, the task may advance to tests_run regardless of order.
+	 * Only populated when parallelization.stageB.parallel.enabled = true.
+	 */
+	stageBCompletion?: Map<string, Set<'reviewer' | 'test_engineer'>>;
+	/** v6.71+ Council mode: per-task council verdict, recorded by delegation-gate when convene_council resolves. */
+	taskCouncilApproved?: Map<
+		string,
+		{ verdict: 'APPROVE' | 'REJECT' | 'CONCERNS'; roundNumber: number }
+	>;
 	/** Last gate outcome for deliberation preamble injection */
 	lastGateOutcome: {
 		gate: string;
@@ -249,21 +272,51 @@ export interface InvocationWindow {
 	warningReason: string;
 }
 
+// Process-global tool aggregates — intentionally shared across all run contexts.
+// Isolated per-run maps live on AgentRunContext; this one is a cross-run accumulator.
+const _toolAggregates = new Map<string, ToolAggregate>();
+
 /**
- * Singleton state object for sharing data across hooks
+ * Default run context — the single active run for current single-threaded behavior.
+ * PR 2 will create additional contexts for parallel dispatcher slots.
+ */
+export const defaultRunContext = new AgentRunContext<
+	ToolCallEntry,
+	ToolAggregate,
+	DelegationEntry,
+	AgentSessionState,
+	EnvironmentProfile
+>('default', _toolAggregates);
+
+// Registry for future multi-run dispatch (dark, not yet populated by production code).
+const _runContexts = new Map<string, typeof defaultRunContext>();
+
+/**
+ * Return the AgentRunContext for the given runId.
+ * No argument or unknown runId returns defaultRunContext (single-run semantics preserved).
+ */
+export function getRunContext(runId?: string): typeof defaultRunContext {
+	if (!runId) return defaultRunContext;
+	return _runContexts.get(runId) ?? defaultRunContext;
+}
+
+/**
+ * Singleton state object for sharing data across hooks.
+ * Per-run maps are backed by defaultRunContext so that swarmState references
+ * stay valid and single-run behavior is unchanged.
  */
 export const swarmState = {
 	/** Active tool calls — keyed by callID for before→after correlation */
-	activeToolCalls: new Map<string, ToolCallEntry>(),
+	activeToolCalls: defaultRunContext.activeToolCalls,
 
-	/** Aggregated tool usage stats — keyed by tool name */
-	toolAggregates: new Map<string, ToolAggregate>(),
+	/** Aggregated tool usage stats — process-global accumulator */
+	toolAggregates: defaultRunContext.toolAggregates,
 
 	/** Active agent per session — keyed by sessionID, updated by chat.message hook */
-	activeAgent: new Map<string, string>(),
+	activeAgent: defaultRunContext.activeAgent,
 
 	/** Delegation chains per session — keyed by sessionID */
-	delegationChains: new Map<string, DelegationEntry[]>(),
+	delegationChains: defaultRunContext.delegationChains,
 
 	/** Number of events since last flush */
 	pendingEvents: 0,
@@ -283,7 +336,7 @@ export const swarmState = {
 	lastBudgetPct: 0,
 
 	/** Per-session guardrail state — keyed by sessionID */
-	agentSessions: new Map<string, AgentSessionState>(),
+	agentSessions: defaultRunContext.agentSessions,
 
 	/** In-flight rehydration promises — awaited by rehydrateState before clearing agentSessions */
 	pendingRehydrations: new Set<Promise<void>>(),
@@ -293,7 +346,7 @@ export const swarmState = {
 	fullAutoEnabledInConfig: false,
 
 	/** Per-session environment profiles — keyed by sessionID */
-	environmentProfiles: new Map<string, EnvironmentProfile>(),
+	environmentProfiles: defaultRunContext.environmentProfiles,
 };
 
 /**
@@ -315,6 +368,13 @@ export function resetSwarmState(): void {
 	// Full Auto Mode (Phase 4)
 	swarmState.fullAutoEnabledInConfig = false;
 	swarmState.environmentProfiles.clear();
+	// v6.70.0 gap-closure (#496): clear the module-scoped pending coder-scope
+	// map so a /swarm close + new session with a colliding taskId (e.g. "1.1")
+	// cannot inherit stale scope from the previous swarm.
+	clearPendingCoderScope();
+	// v6.71+ Clear the council-mode disagreement warn-once memo so tests and
+	// fresh sessions observe consistent first-time warnings.
+	_councilDisagreementWarned.clear();
 	// Note: Session-scoped fields (architectWriteCount, gateLog, reviewerCallCount, lastGateFailure)
 	// are cleared when agentSessions entries are deleted
 }
@@ -378,6 +438,8 @@ export function startAgentSession(
 		qaSkipTaskIds: [],
 		// v6.21 Per-task state machine
 		taskWorkflowStates: new Map(),
+		stageBCompletion: new Map(),
+		taskCouncilApproved: new Map(),
 		lastGateOutcome: null,
 		declaredCoderScope: null,
 		lastScopeViolation: null,
@@ -555,6 +617,14 @@ export function ensureAgentSession(
 		// v6.21 Per-task state machine migration safety
 		if (!session.taskWorkflowStates) {
 			session.taskWorkflowStates = new Map();
+		}
+		// PR 2 Stage B barrier migration safety
+		if (!session.stageBCompletion) {
+			session.stageBCompletion = new Map();
+		}
+		// v6.71+ Council mode migration safety
+		if (!session.taskCouncilApproved) {
+			session.taskCouncilApproved = new Map();
 		}
 		if (session.lastGateOutcome === undefined) {
 			session.lastGateOutcome = null;
@@ -833,9 +903,18 @@ export function advanceTaskState(
 
 	// 'complete' can only be reached from 'tests_run' — enforce sequential progression
 	if (newState === 'complete' && current !== 'tests_run') {
-		throw new Error(
-			`INVALID_TASK_STATE_TRANSITION: ${taskId} cannot reach complete from ${current} — must pass through tests_run first`,
-		);
+		// Council fast-path: if convene_council recorded an APPROVE verdict for this task,
+		// allow advancement from any non-idle prior state. Pre-check (pre_check_passed) is
+		// still required to avoid skipping Stage A.
+		const councilEntry = session.taskCouncilApproved?.get(taskId);
+		const councilApproved = councilEntry?.verdict === 'APPROVE';
+		const pastPreCheck =
+			currentIndex >= STATE_ORDER.indexOf('pre_check_passed');
+		if (!councilApproved || !pastPreCheck) {
+			throw new Error(
+				`INVALID_TASK_STATE_TRANSITION: ${taskId} cannot reach complete from ${current} — must pass through tests_run first (or have council APPROVE after pre_check)`,
+			);
+		}
 	}
 
 	session.taskWorkflowStates.set(taskId, newState);
@@ -866,6 +945,134 @@ export function getTaskState(
 	}
 
 	return session.taskWorkflowStates.get(taskId) ?? 'idle';
+}
+
+/**
+ * PR 2 Stage B barrier: record that a Stage B agent has completed for a task.
+ * Order-independent — either 'reviewer' or 'test_engineer' may complete first.
+ * Initializes the per-task set on first write.
+ *
+ * @param session - The agent session state
+ * @param taskId - The task identifier
+ * @param agent - Which Stage B agent completed ('reviewer' or 'test_engineer')
+ */
+export function recordStageBCompletion(
+	session: AgentSessionState,
+	taskId: string,
+	agent: 'reviewer' | 'test_engineer',
+): void {
+	if (!isValidTaskId(taskId)) return;
+	if (!session.stageBCompletion) {
+		session.stageBCompletion = new Map();
+	}
+	const existing = session.stageBCompletion.get(taskId);
+	if (existing) {
+		existing.add(agent);
+	} else {
+		session.stageBCompletion.set(taskId, new Set([agent]));
+	}
+}
+
+/**
+ * PR 2 Stage B barrier: returns true iff both 'reviewer' and 'test_engineer' have
+ * been recorded for the given task in this session.
+ *
+ * @param session - The agent session state
+ * @param taskId - The task identifier
+ * @returns true when both Stage B agents have completed
+ */
+export function hasBothStageBCompletions(
+	session: AgentSessionState,
+	taskId: string,
+): boolean {
+	if (!isValidTaskId(taskId)) return false;
+	const completions = session.stageBCompletion?.get(taskId);
+	if (!completions) return false;
+	return completions.has('reviewer') && completions.has('test_engineer');
+}
+
+/**
+ * Derive the plan_id from a Plan, matching the format used by other consumers
+ * (set_qa_gates / get_qa_gate_profile / get_approved_plan / write-drift-evidence).
+ */
+function derivePlanIdFromPlan(plan: { swarm: string; title: string }): string {
+	return `${plan.swarm}-${plan.title}`.replace(/[^a-zA-Z0-9-_]/g, '_');
+}
+
+/**
+ * Returns true iff council is authoritative for the current plan.
+ *
+ * AND semantics: council is authoritative when BOTH `pluginConfig.council.enabled === true`
+ * AND `QaGates.council_mode === true` for the plan associated with this directory.
+ *
+ * If exactly one of the two flags is true, a one-time warning is logged per plan_id
+ * (so operators can see the deadlock case) and the function falls back to `false`,
+ * which keeps Stage B running as the default.
+ *
+ * Returns false when the plan or QA gate profile cannot be loaded — when the plan
+ * is missing the council cannot meaningfully be "authoritative".
+ */
+export async function isCouncilGateActive(
+	directory: string,
+	council: { enabled?: boolean } | undefined,
+): Promise<boolean> {
+	const enabled = council?.enabled === true;
+
+	let plan: Plan | null = null;
+	try {
+		plan = await loadPlanJsonOnly(directory);
+	} catch {
+		plan = null;
+	}
+	if (!plan) {
+		return false;
+	}
+
+	const planId = derivePlanIdFromPlan(plan);
+	let profile: ReturnType<typeof getProfile> | null = null;
+	try {
+		profile = getProfile(directory, planId);
+	} catch (err) {
+		// getProfile returns null on missing DB; it only throws on unexpected I/O or
+		// SQLite errors (EACCES, EBUSY, corrupt database). Log those so they're visible.
+		const msg = err instanceof Error ? err.message : String(err);
+		const isBenign = msg.includes('SQLITE_CANTOPEN') || msg.includes('ENOENT');
+		if (!isBenign) {
+			console.warn(
+				`[isCouncilGateActive] getProfile threw unexpectedly for plan ${planId}: ${msg}. Treating council as inactive.`,
+			);
+		}
+		profile = null;
+	}
+	if (!profile) {
+		return false;
+	}
+
+	const councilMode = profile.gates.council_mode === true;
+
+	if (enabled && councilMode) {
+		return true;
+	}
+
+	// Disagreement case: warn once per plan_id, then fall back.
+	if (enabled !== councilMode && !_councilDisagreementWarned.has(planId)) {
+		_councilDisagreementWarned.add(planId);
+		console.warn(
+			`[delegation-gate] Council mode mismatch for plan ${planId}: ` +
+				`pluginConfig.council.enabled=${enabled}, QaGates.council_mode=${councilMode}. ` +
+				'Falling back to Stage B (non-council) advancement.',
+		);
+	}
+
+	return false;
+}
+
+/**
+ * Test-only helper: clear the warn-once memo so each test can observe a fresh
+ * disagreement warning. Not part of the public surface.
+ */
+export function _resetCouncilDisagreementWarnings(): void {
+	_councilDisagreementWarned.clear();
 }
 
 /**
@@ -1041,6 +1248,9 @@ export function applyRehydrationCache(session: AgentSessionState): void {
 	if (!session.taskWorkflowStates) {
 		session.taskWorkflowStates = new Map();
 	}
+	if (!session.taskCouncilApproved) {
+		session.taskCouncilApproved = new Map();
+	}
 
 	const { planTaskStates, evidenceMap } = _rehydrationCache;
 
@@ -1082,6 +1292,48 @@ export function applyRehydrationCache(session: AgentSessionState): void {
 				session.taskWorkflowStates.set(taskId, planState);
 			}
 		}
+	}
+
+	// Rehydrate council verdicts from evidenceMap for ALL tasks (not just planTaskStates).
+	// In-memory entries take priority; skip on malformed or missing data.
+	const VALID_COUNCIL_VERDICTS = new Set([
+		'APPROVE',
+		'REJECT',
+		'CONCERNS',
+	] as const);
+	for (const [taskId, evidence] of evidenceMap) {
+		// Skip if already in memory (in-memory wins over persisted evidence).
+		if (session.taskCouncilApproved.has(taskId)) {
+			continue;
+		}
+		// Cast to extended type — verdict/roundNumber are preserved via passthrough()
+		// but not in the base GateEvidence interface (which only has sessionId/timestamp/agent).
+		const council = evidence.gates?.council as
+			| { verdict?: string; roundNumber?: number }
+			| undefined;
+		if (!council) {
+			continue;
+		}
+		const rawVerdict = council.verdict;
+		if (!rawVerdict || typeof rawVerdict !== 'string') {
+			continue;
+		}
+		if (
+			!VALID_COUNCIL_VERDICTS.has(
+				rawVerdict as 'APPROVE' | 'REJECT' | 'CONCERNS',
+			)
+		) {
+			continue;
+		}
+		const verdict = rawVerdict as 'APPROVE' | 'REJECT' | 'CONCERNS';
+		let roundNumber = council.roundNumber;
+		if (typeof roundNumber !== 'number' || !Number.isFinite(roundNumber)) {
+			roundNumber = 1;
+		}
+		session.taskCouncilApproved.set(taskId, {
+			verdict,
+			roundNumber,
+		});
 	}
 }
 

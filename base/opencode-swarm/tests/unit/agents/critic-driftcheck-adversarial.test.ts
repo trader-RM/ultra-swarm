@@ -244,25 +244,25 @@ describe('critic.ts PHASE DRIFT VERIFIER ADVERSARIAL', () => {
 		});
 	});
 
-  describe('Identity and Posture', () => {
-	it('should identify as Critic (Phase Drift Verifier)', () => {
-		expect(prompt).toContain('Critic (Phase Drift Verifier)');
-	});
+	describe('Identity and Posture', () => {
+		it('should identify as Critic (Phase Drift Verifier)', () => {
+			expect(prompt).toContain('Critic (Phase Drift Verifier)');
+		});
 
-	it('should set DEFAULT POSTURE to SKEPTICAL', () => {
-		expect(prompt).toContain('DEFAULT POSTURE: SKEPTICAL');
-	});
+		it('should set DEFAULT POSTURE to SKEPTICAL', () => {
+			expect(prompt).toContain('DEFAULT POSTURE: SKEPTICAL');
+		});
 
-	it('should allow delegation to planner and gan-planner', () => {
-		expect(prompt).toContain('planner');
-		expect(prompt).toContain('gan-planner');
-	});
+		it('should allow delegation to planner and gan-planner', () => {
+			expect(prompt).toContain('planner');
+			expect(prompt).toContain('gan-planner');
+		});
 
-	it('should disambiguate from plan_critic and sounding_board', () => {
-		expect(prompt).toContain('NOT for plan review (use plan_critic)');
-		expect(prompt).toContain('pre-escalation (use sounding_board)');
+		it('should disambiguate from plan_critic and sounding_board', () => {
+			expect(prompt).toContain('NOT for plan review (use plan_critic)');
+			expect(prompt).toContain('pre-escalation (use sounding_board)');
+		});
 	});
-  });
 
 	describe('PRESSURE IMMUNITY Section', () => {
 		it('should address urgency manufacturing', () => {

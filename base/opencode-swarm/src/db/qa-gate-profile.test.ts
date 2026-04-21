@@ -172,4 +172,15 @@ describe('qa-gate-profile', () => {
 		const eff = getEffectiveGates(p, { reviewer: false });
 		expect(eff.reviewer).toBe(true);
 	});
+
+	test('getEffectiveGates ratchets hallucination_guard via session overrides', () => {
+		const p = getOrCreateProfile(tempDir, 'plan-hg');
+		// Default is now true (ECC defaults)
+		expect(p.gates.hallucination_guard).toBe(true);
+		// Setting again is a no-op
+		const eff = getEffectiveGates(p, { hallucination_guard: true });
+		expect(eff.hallucination_guard).toBe(true);
+		// Other gates unchanged
+		expect(eff.reviewer).toBe(true);
+	});
 });

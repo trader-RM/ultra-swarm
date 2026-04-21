@@ -57,10 +57,12 @@ export function stripKnownSwarmPrefix(agentName: string): string {
 		}
 	}
 
-	// Check if stripped result is a known agent name
-	// ECC specialist agents (37 added in v6.68.0+) are resolvable here via their
-	// membership in ALL_AGENT_NAMES (derived from ALL_SUBAGENT_NAMES in constants.ts).
-	// Example: stripKnownSwarmPrefix('local_gan_evaluator') → 'gan_evaluator' ✓
+	// Check if stripped result is a known core agent name
+	// Only the 15 core agents (architect + subagents) are in ALL_AGENT_NAMES.
+	// ECC specialist agents (code_reviewer, build_error_resolver, etc.) are NOT in
+	// ALL_AGENT_NAMES — they are created dynamically via createECCAgent in index.ts
+	// and registered in AGENT_CATEGORY. Multi-swarm prefix stripping for ECC
+	// specialists falls through to Strategy 2 (suffix matching) below.
 	if ((ALL_AGENT_NAMES as readonly string[]).includes(stripped)) {
 		return stripped;
 	}
@@ -68,7 +70,9 @@ export function stripKnownSwarmPrefix(agentName: string): string {
 	// Strategy 2: Check if the name ENDS with a known agent name (with separator)
 	// Sort by length descending to ensure longest matches are found first
 	// Fixes suffix collision bug where 'architect' would match before 'a11y_architect'
-	const sortedAgentNames = [...ALL_AGENT_NAMES].sort((a, b) => b.length - a.length);
+	const sortedAgentNames = [...ALL_AGENT_NAMES].sort(
+		(a, b) => b.length - a.length,
+	);
 	for (const agent of sortedAgentNames) {
 		for (const sep of SEPARATORS) {
 			const suffix = sep + agent;
@@ -610,6 +614,25 @@ export const GuardrailsConfigSchema = z.object({
 		.optional(),
 	profiles: z.record(z.string(), GuardrailsProfileSchema).optional(),
 	block_destructive_commands: z.boolean().default(true),
+	/**
+	 * Restrict the bash/shell interpreter to a specific set of agent roles.
+	 *
+	 * When `undefined` (default), all agents may invoke bash/shell.
+	 *
+	 * WARNING: Supplying an empty array (`[]`) blocks ALL agents including
+	 * architect — this is almost always a misconfiguration. To allow every
+	 * agent, omit the field entirely rather than setting it to `[]`.
+	 *
+	 * Agent role names are matched case-insensitively after swarm prefix
+	 * stripping (e.g. "swarm-architect" matches "architect").
+	 */
+	interpreter_allowed_agents: z.array(z.string().min(1)).optional(),
+	/**
+	 * When true (default), every bash/shell invocation is appended as a
+	 * single-line JSON entry to `.swarm/session/shell-audit.jsonl` with
+	 * known secret patterns (tokens, passwords, Bearer headers) redacted.
+	 */
+	shell_audit_log: z.boolean().default(true),
 });
 
 export type GuardrailsConfig = z.infer<typeof GuardrailsConfigSchema>;
@@ -836,6 +859,12 @@ export const KnowledgeConfigSchema = z.object({
 	encounter_increment: z.number().min(0).max(1).default(0.1),
 	/** Weighted scoring: maximum encounter score cap */
 	max_encounter_score: z.number().min(1).max(20).default(10.0),
+	/** Default N-phase TTL for knowledge entries */
+	default_max_phases: z.number().int().positive().default(10),
+	/** N-phase TTL for 'todo' category entries */
+	todo_max_phases: z.number().int().positive().default(3),
+	/** Enable age-based sweep of stale knowledge entries */
+	sweep_enabled: z.boolean().default(true),
 });
 
 export type KnowledgeConfig = z.infer<typeof KnowledgeConfigSchema>;
@@ -925,6 +954,10 @@ export type AgentAuthorityRule = z.infer<typeof AgentAuthorityRuleSchema>;
 export const AuthorityConfigSchema = z.object({
 	enabled: z.boolean().default(true),
 	rules: z.record(z.string(), AgentAuthorityRuleSchema).default({}),
+	// Path prefixes that no agent may write to, regardless of per-agent rules.
+	// Applied before per-agent authority checks and cannot be overridden.
+	// Example: [".env", ".git/config", "secrets/"]
+	universal_deny_prefixes: z.array(z.string().min(1)).default([]),
 });
 
 export type AuthorityConfig = z.infer<typeof AuthorityConfigSchema>;
@@ -955,6 +988,35 @@ export const CouncilConfigSchema = z
 	.strict();
 
 export type CouncilConfig = z.infer<typeof CouncilConfigSchema>;
+
+// Parallelization configuration (PR 1 — dark foundation, disabled by default)
+// All fields default to single-run-equivalent values so no production path
+// activates parallel execution while this config exists.
+export const ParallelizationConfigSchema = z.object({
+	/** Master switch. Defaults to false — no parallel execution in current code. */
+	enabled: z.boolean().default(false),
+	/** Maximum concurrent tasks. 1 = serial (current behavior). */
+	maxConcurrentTasks: z.number().int().min(1).max(64).default(1),
+	/** Timeout in ms for evidence file locks before throwing EvidenceLockTimeoutError. */
+	evidenceLockTimeoutMs: z.number().int().min(1000).max(300000).default(60000),
+	/**
+	 * Stage B (reviewer + test_engineer) parallelization settings.
+	 * PR 2 runtime gating — defaults to disabled so no production path activates
+	 * order-independent barrier semantics until explicitly opted in.
+	 */
+	stageB: z
+		.object({
+			parallel: z
+				.object({
+					/** When true, reviewer and test_engineer run order-independently (barrier). Default: false. */
+					enabled: z.boolean().default(false),
+				})
+				.default({ enabled: false }),
+		})
+		.default({ parallel: { enabled: false } }),
+});
+
+export type ParallelizationConfig = z.infer<typeof ParallelizationConfigSchema>;
 
 // Main plugin configuration
 export const PluginConfigSchema = z.object({
@@ -1102,6 +1164,10 @@ export const PluginConfigSchema = z.object({
 
 	// Work Complete Council configuration — parallel four-member verification gate (off by default)
 	council: CouncilConfigSchema.optional(),
+
+	// Parallelization configuration (PR 1 dark foundation — disabled by default)
+	// Exists structurally; no production code path branches on enabled===true yet.
+	parallelization: ParallelizationConfigSchema.optional(),
 
 	// Turbo mode — bypasses reviewer/test gates for rapid iteration (v6.40)
 	turbo_mode: z.boolean().default(false).optional(),

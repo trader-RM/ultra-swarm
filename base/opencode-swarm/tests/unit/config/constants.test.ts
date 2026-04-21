@@ -30,13 +30,14 @@ describe('constants.ts', () => {
 	});
 
 	describe('ALL_SUBAGENT_NAMES', () => {
-		it('contains all 60 subagents (ECC agents, build, pipeline, support, design, analysis)', () => {
-			// Expanded registry: SME (17), Build (8), Pipeline (8), Support (11), Design Support (2), Analysis (1) agents
+		it('contains all 14 Swarm subagents', () => {
+			// 14 Swarm agents: explorer, coder, test_engineer, reviewer, critic + 3 variants, sme, docs, designer, curator_init, curator_phase
 			expect(ALL_SUBAGENT_NAMES).toContain('sme');
 			expect(ALL_SUBAGENT_NAMES).toContain('docs');
 			expect(ALL_SUBAGENT_NAMES).toContain('designer');
 			expect(ALL_SUBAGENT_NAMES).toContain('critic_sounding_board');
 			expect(ALL_SUBAGENT_NAMES).toContain('critic_drift_verifier');
+			expect(ALL_SUBAGENT_NAMES).toContain('critic_hallucination_verifier');
 			expect(ALL_SUBAGENT_NAMES).toContain('curator_init');
 			expect(ALL_SUBAGENT_NAMES).toContain('curator_phase');
 			expect(ALL_SUBAGENT_NAMES).toContain('reviewer');
@@ -45,19 +46,19 @@ describe('constants.ts', () => {
 			expect(ALL_SUBAGENT_NAMES).toContain('explorer');
 			expect(ALL_SUBAGENT_NAMES).toContain('coder');
 			expect(ALL_SUBAGENT_NAMES).toContain('test_engineer');
-			expect(ALL_SUBAGENT_NAMES).toHaveLength(60);
+			expect(ALL_SUBAGENT_NAMES).toHaveLength(14);
 		});
 	});
 
 	describe('ALL_AGENT_NAMES', () => {
-		it('contains architect + all 60 subagents = 61 total', () => {
+		it('contains architect + all 14 subagents = 15 total', () => {
 			// architect must be first — it is the orchestrator and must be listed before all subagents
 			expect(ALL_AGENT_NAMES[0]).toBe('architect');
 			// All subagents must be present
 			for (const name of ALL_SUBAGENT_NAMES) {
 				expect(ALL_AGENT_NAMES).toContain(name);
 			}
-			expect(ALL_AGENT_NAMES).toHaveLength(61);
+			expect(ALL_AGENT_NAMES).toHaveLength(15);
 		});
 	});
 
@@ -133,10 +134,9 @@ describe('constants.ts', () => {
 			}
 		});
 
-		it('has exactly 23 entries (explicit keys + default, no architect)', () => {
-			// Expanded registry with ECC agents: Explorer, Pipeline (3), SME, Critic variants, Docs, Designer, Curator variants,
-			// ECC Design Support (2), ECC agents + default = 23 total
-			expect(Object.keys(DEFAULT_MODELS)).toHaveLength(23);
+		it('has exactly 15 entries (explicit agent keys + default, no architect)', () => {
+			// 14 Swarm agents + default fallback = 15 total (architect not in DEFAULT_MODELS)
+			expect(Object.keys(DEFAULT_MODELS)).toHaveLength(15);
 		});
 	});
 

@@ -22,10 +22,10 @@ describe('agent-categories', () => {
 	});
 
 	describe('AGENT_CATEGORY map', () => {
-		test('has exactly 61 entries', () => {
-			// Full ECC expansion: 14 core + 18 review/qa + 16 pipeline + 11 support + 2 design = 61 total
+		test('has exactly 14 entries', () => {
+			// 14 Swarm agents: architect, explorer, coder, test_engineer, reviewer, critic (3 variants), sme, docs, designer, curator (2 variants)
 			const entries = Object.entries(AGENT_CATEGORY);
-			expect(entries).toHaveLength(61);
+			expect(entries).toHaveLength(14);
 		});
 
 		test('architect maps to orchestrator', () => {

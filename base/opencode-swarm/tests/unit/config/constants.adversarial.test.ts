@@ -76,4 +76,4 @@ describe('constants.ts Adversarial', () => {
 			expect(uniqueAgents.size).toBe(ALL_AGENT_NAMES.length);
 		});
 	});
-});
+});

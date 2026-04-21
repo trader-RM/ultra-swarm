@@ -48,4 +48,4 @@ describe('Agent Registration Constants (Swarm Only)', () => {
 	test('designer has DEFAULT_MODELS entry', () => {
 		expect(DEFAULT_MODELS['designer']).toBeDefined();
 	});
-});
+});

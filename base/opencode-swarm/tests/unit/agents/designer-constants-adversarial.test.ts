@@ -53,4 +53,4 @@ describe('Swarm Agent Constants Adversarial Registration', () => {
 		expect(getAgentCategory('explorer')).toBe('pipeline');
 		expect(getAgentCategory('sme')).toBe('support');
 	});
-});
+});

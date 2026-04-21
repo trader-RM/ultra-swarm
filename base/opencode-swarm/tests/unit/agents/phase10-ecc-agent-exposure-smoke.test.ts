@@ -154,4 +154,4 @@ describe('Phase 10 ECC Agent Exposure Smoke Test', () => {
       expect(curatorPhaseConfig?.permission?.task).toBe('allow');
     });
   });
-});
+});

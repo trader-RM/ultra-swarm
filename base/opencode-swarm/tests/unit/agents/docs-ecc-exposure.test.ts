@@ -4,7 +4,7 @@ import { getAgentConfigs, DOCS_PROMPT } from '../../../src/agents';
 // Approved ECC doc agents for docs (3 doc specialists)
 const APPROVED_DOCS_AGENTS = ['doc-updater', 'docs-lookup', 'comment-analyzer'] as const;
 
-// Excluded ECC agents (build, pipeline, review, support — NOT approved for docs)
+// Excluded ECC agents (build, pipeline, review, support ΓÇö NOT approved for docs)
 const EXCLUDED_BUILD_AGENTS = [
 	'build-error-resolver',
 	'cpp-build-resolver',
@@ -67,7 +67,7 @@ const DELEGATION_RULES = [
 	'AFTER DELEGATION',
 ] as const;
 
-describe('Docs ECC Exposure — Phase 8', () => {
+describe('Docs ECC Exposure ΓÇö Phase 8', () => {
 	describe('Approved ECC doc agents in prompt', () => {
 		for (const agent of APPROVED_DOCS_AGENTS) {
 			test(`${agent} is listed in DOCS_PROMPT`, () => {

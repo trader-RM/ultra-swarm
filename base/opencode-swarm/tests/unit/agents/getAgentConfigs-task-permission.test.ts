@@ -167,8 +167,6 @@ describe('getAgentConfigs - Architect Task Permission Hotfix', () => {
 			expect(testEngineerConfig.mode).toBe('subagent');
 			expect(testEngineerConfig.permission).toEqual({ task: 'allow' });
 		});
-
-
 	});
 
 	describe('multiple swarm scenarios', () => {

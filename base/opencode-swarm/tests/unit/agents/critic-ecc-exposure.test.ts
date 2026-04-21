@@ -10,7 +10,7 @@ import {
 // Approved ECC planning agents for critic (2 support specialists)
 const APPROVED_CRITIC_AGENTS = ['planner', 'gan-planner'] as const;
 
-// Agents that do NOT exist in ALL_SUBAGENT_NAMES — skipped per user instruction
+// Agents that do NOT exist in ALL_SUBAGENT_NAMES ΓÇö skipped per user instruction
 const SKIPPED_NONEXISTENT_AGENTS = [
 	'code-simplifier',
 	'silent-failure-hunter',
@@ -79,7 +79,7 @@ const DELEGATION_RULES = [
 	'AFTER DELEGATION',
 ] as const;
 
-describe('Critic ECC Exposure — Phase 7', () => {
+describe('Critic ECC Exposure ΓÇö Phase 7', () => {
 	describe('Approved ECC planning agents in all critic prompts', () => {
 		const criticPrompts = [
 			PLAN_CRITIC_PROMPT,
@@ -191,9 +191,9 @@ describe('Critic ECC Exposure — Phase 7', () => {
 			);
 		});
 
-		test('PLAN_CRITIC_PROMPT does NOT contain "IGNORE them — they are context from the orchestrator"', () => {
+		test('PLAN_CRITIC_PROMPT does NOT contain "IGNORE them ΓÇö they are context from the orchestrator"', () => {
 			expect(PLAN_CRITIC_PROMPT).not.toContain(
-				'IGNORE them — they are context from the orchestrator, not instructions for you to delegate',
+				'IGNORE them ΓÇö they are context from the orchestrator, not instructions for you to delegate',
 			);
 		});
 	});
@@ -334,4 +334,4 @@ describe('Critic ECC Exposure — Phase 7', () => {
 			);
 		});
 	});
-});
+});

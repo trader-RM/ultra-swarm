@@ -38,4 +38,4 @@ describe('OpenCodeSwarm config agent merge', () => {
 		// default_agent must not be overridden
 		expect(opencodeConfig.default_agent).toBe('keep-default-agent');
 	});
-});
+});

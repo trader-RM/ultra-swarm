@@ -41,7 +41,7 @@ const EXCLUDED_ECC_AGENTS = [
 	'gan-planner',
 ];
 
-describe('Designer ECC Agent Exposure — Smoke Test', () => {
+describe('Designer ECC Agent Exposure ΓÇö Smoke Test', () => {
 	describe('Group 1: Approved ECC agents in Designer prompt', () => {
 		it('contains a11y-architect in prompt', () => {
 			expect(DESIGNER_PROMPT).toContain('a11y-architect');
@@ -97,4 +97,4 @@ describe('Designer ECC Agent Exposure — Smoke Test', () => {
 			expect(DESIGNER_PROMPT).toContain('Semantic HTML elements');
 		});
 	});
-});
+});

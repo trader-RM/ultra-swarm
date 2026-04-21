@@ -26,6 +26,7 @@ import {
 } from '../config/schema';
 import { classifyFile, type FileZone } from '../context/zone-classifier';
 import { loadPlan } from '../plan/manager';
+import { resolveScopeWithFallbacks } from '../scope/scope-persistence';
 import {
 	advanceTaskState,
 	beginInvocation,
@@ -37,6 +38,7 @@ import {
 import { telemetry } from '../telemetry.js';
 import { log, warn } from '../utils';
 import { resolveAgentConflict } from './conflict-resolution';
+import { pendingCoderScopeByTaskId } from './delegation-gate.js';
 import { extractCurrentPhaseFromPlan } from './extractors';
 import { detectLoop } from './loop-detector';
 import { extractModelInfo } from './model-limits';
@@ -250,6 +252,10 @@ function getCurrentTaskId(sessionId: string): string {
 /**
  * v6.21 Task 5.4: Check if a file path is within declared scope entries.
  * Handles both exact matches and directory containment.
+ *
+ * v6.70.0 gap-closure: on Windows (case-insensitive FS), compare lowercased
+ * variants so scope `config/` correctly matches a write to `Config/foo.rb`.
+ * POSIX filesystems stay case-sensitive.
  */
 function isInDeclaredScope(
 	filePath: string,
@@ -257,15 +263,599 @@ function isInDeclaredScope(
 	cwd?: string,
 ): boolean {
 	const dir = cwd ?? process.cwd();
-	const resolvedFile = path.resolve(dir, filePath);
+	const caseInsensitive = process.platform === 'win32';
+	const resolvedFileRaw = path.resolve(dir, filePath);
+	const resolvedFile = caseInsensitive
+		? resolvedFileRaw.toLowerCase()
+		: resolvedFileRaw;
 	return scopeEntries.some((scope) => {
-		const resolvedScope = path.resolve(dir, scope);
+		const resolvedScopeRaw = path.resolve(dir, scope);
+		const resolvedScope = caseInsensitive
+			? resolvedScopeRaw.toLowerCase()
+			: resolvedScopeRaw;
 		// Exact match: file IS the scope entry
 		if (resolvedFile === resolvedScope) return true;
 		// Directory containment: file is inside a scope directory
 		const rel = path.relative(resolvedScope, resolvedFile);
 		return rel.length > 0 && !rel.startsWith('..') && !path.isAbsolute(rel);
 	});
+}
+
+// ============================================================================
+// PR A: Cross-platform destructive command protection helpers
+// ============================================================================
+
+/** Maximum recursion depth for wrapper unwrapping */
+const DC_MAX_UNWRAP_DEPTH = 5;
+
+/**
+ * Expanded safe-target allowlist for recursive delete operations.
+ * These directory names are safe to delete recursively by name alone.
+ * NOTE: Subdirectory paths like node_modules/.cache are NOT safe — the
+ * check requires the target be exactly one of these bare names.
+ */
+const DC_SAFE_TARGETS = new Set([
+	'node_modules',
+	'.git',
+	'dist',
+	'build',
+	'coverage',
+	'.next',
+	'.turbo',
+	'.cache',
+	'.venv',
+	'venv',
+	'__pycache__',
+	'target',
+	'out',
+	'.parcel-cache',
+	'.svelte-kit',
+	'.nuxt',
+	'.output',
+	'.angular',
+	'.gradle',
+	'vendor',
+]);
+
+/**
+ * Path prefixes that are unconditionally blocked as destructive targets.
+ * These represent filesystem roots and critical system directories.
+ */
+const DC_BLOCKED_ABSOLUTE_PREFIXES: readonly string[] = [
+	// POSIX roots
+	'/root',
+	'/home',
+	'/Users',
+	'/etc',
+	'/var',
+	'/usr',
+	'/opt',
+	'/bin',
+	'/sbin',
+	'/lib',
+	'/boot',
+	'/proc',
+	'/sys',
+	'/dev',
+	'/run',
+	'/System',
+	'/Library',
+	'/Applications',
+	// Windows roots (drive letters)
+	'C:\\Windows',
+	'C:\\Users',
+	'C:\\Program Files',
+	'C:\\ProgramData',
+	'C:/Windows',
+	'C:/Users',
+	'C:/Program Files',
+	'C:/ProgramData',
+];
+
+/** Filesystem roots that are always blocked outright */
+const DC_FS_ROOTS = new Set(['/', 'C:\\', 'C:/', 'D:\\', 'D:/', 'E:\\', 'E:/']);
+
+/** Path prefixes indicating a remote or network filesystem (best-effort) */
+const DC_REMOTE_PREFIXES: readonly string[] = [
+	'\\\\', // UNC paths e.g. \\server\share
+	'/Volumes/', // macOS external/network volumes
+	'/net/', // autofs network paths
+	'/nfs/', // explicit NFS mounts
+	'/smb/', // Samba mounts
+	'/run/user/', // user session mounts
+];
+
+/**
+ * Normalize a command string for pattern matching:
+ * 1. Unicode NFKC normalize (collapses homoglyphs)
+ * 2. Detect evasion techniques that exist only to defeat scanners
+ *
+ * When an evasion technique is detected, the decoded form is returned so
+ * that pattern matching can still fire on it. Only fails-closed when the
+ * evasion wraps a form we cannot safely decode.
+ */
+function dcNormalizeCommand(cmd: string): string {
+	// Step 1: NFKC — collapses Unicode fullwidth letters and homoglyphs
+	let s = cmd.normalize('NFKC');
+
+	// Step 2: PowerShell backtick escapes — PS uses ` as escape char inside strings.
+	// `r`m`d`i`r decodes to rmdir; R`e`m`o`v`e`-`I`t`e`m decodes to Remove-Item.
+	// In PS, backtick before ANY character produces that character (e.g. `- is just -).
+	// Strip all backtick-char pairs so pattern matching fires on the decoded form.
+	s = s.replace(/`(.)/g, '$1');
+
+	// Step 3: cmd.exe caret escapes — ^r^m^d^i^r decodes to rmdir.
+	// Carets outside quoted strings are escape characters; collapse all caret-letter sequences.
+	s = s.replace(/\^([a-zA-Z0-9 ])/g, '$1');
+
+	// Step 4: quote-splicing evasion e.g. r""m""dir or R''e''m''o''v''e''-''I''t''e''m
+	// Collapse both doubled double-quotes and doubled single-quotes (PS single-quote splice).
+	s = s.replace(/""/g, '');
+	s = s.replace(/''/g, '');
+
+	return s;
+}
+
+/**
+ * Strip one layer of a shell wrapper from a command string.
+ * Returns the inner command if a wrapper was found, null otherwise.
+ *
+ * Handles:
+ *   - cmd /c "..."  cmd /k "..."
+ *   - powershell -Command "..." / -c "..." / -EncodedCommand <b64> / -enc <b64>
+ *   - pwsh -Command / -c / -EncodedCommand / -enc
+ *   - bash -c "..." / sh -c / zsh -c
+ *   - sudo <...> / env VAR=val <...> / time <...> / nohup <...>
+ *   - wsl -e ... / wsl -- ... / wsl.exe -e ...
+ *   - PowerShell & { ... } script blocks
+ *   - PowerShell iex / Invoke-Expression <...>
+ *   - call <...> (batch)
+ */
+function dcStripOneWrapper(cmd: string): string | null {
+	const t = cmd.trim();
+
+	// cmd.exe wrappers: cmd /c "inner" or cmd /k "inner" — case-insensitive (CMD, cmd, Cmd)
+	const cmdExeMatch = /^cmd(?:\.exe)?\s+\/[ckCK]\s+"?(.*?)"?\s*$/is.exec(t);
+	if (cmdExeMatch) return cmdExeMatch[1].trim();
+
+	// PowerShell -Command / -c variants — case-insensitive (POWERSHELL, powershell, pwsh, PWSH)
+	const psCommandMatch =
+		/^(?:powershell|pwsh)(?:\.exe)?\s+(?:-(?:Command|command|c)\s+)(.+)$/is.exec(
+			t,
+		);
+	if (psCommandMatch)
+		return psCommandMatch[1].replace(/^["']|["']$/g, '').trim();
+
+	// PowerShell -EncodedCommand / -enc (base64): decode and return
+	const psEncMatch =
+		/^(?:powershell|pwsh)(?:\.exe)?\s+(?:-(?:EncodedCommand|encodedcommand|enc|e)\s+)([A-Za-z0-9+/=]+)\s*$/.exec(
+			t,
+		);
+	if (psEncMatch) {
+		try {
+			const decoded = Buffer.from(psEncMatch[1], 'base64').toString('utf16le');
+			return decoded.trim();
+		} catch {
+			// Cannot decode — fail closed by returning the original (pattern match will see -EncodedCommand)
+			return t;
+		}
+	}
+
+	// bash/sh/zsh -c "inner" — case-insensitive for consistency with other wrappers
+	const shellMatch =
+		/^(?:bash|sh|zsh|dash|fish)(?:\.exe)?\s+-c\s+"?(.*?)"?\s*$/is.exec(t);
+	if (shellMatch) return shellMatch[1].trim();
+
+	// sudo / env VAR=val / time / nohup / nice -n N: strip leading word + optional args
+	// Case-insensitive: SUDO, TIME, NOHUP are valid in encoded/obfuscated commands.
+	const prefixMatch =
+		/^(?:sudo|time|nohup)\s+(.+)$/is.exec(t) ??
+		/^env(?:\s+[A-Za-z_][A-Za-z0-9_]*=[^\s]*)*\s+(.+)$/is.exec(t) ??
+		/^nice\s+(?:-n\s+\d+\s+)?(.+)$/is.exec(t);
+	if (prefixMatch) return prefixMatch[1].trim();
+
+	// WSL cross-OS bridge: wsl -e ... / wsl -- ... / wsl.exe -e ...
+	// Case-insensitive: WSL.EXE is commonly written uppercase on Windows.
+	// These execute commands in the Linux subsystem — paths like /mnt/c/ map to C:\
+	const wslMatch = /^wsl(?:\.exe)?\s+(?:-e|--)\s+(.+)$/is.exec(t);
+	if (wslMatch) return wslMatch[1].trim();
+
+	// PowerShell script block: & { ... } or & { ... } ; & { ... }
+	const scriptBlockMatch = /^&\s*\{(.+)\}$/s.exec(t);
+	if (scriptBlockMatch) return scriptBlockMatch[1].trim();
+
+	// PowerShell Invoke-Expression / iex
+	const iexMatch = /^(?:Invoke-Expression|iex)\s+(.+)$/is.exec(t);
+	if (iexMatch) return iexMatch[1].replace(/^["'`]|["'`]$/g, '').trim();
+
+	// PowerShell Invoke-Command -ScriptBlock { ... }
+	const invokeCommandMatch =
+		/^Invoke-Command\s+.*-ScriptBlock\s*\{(.+)\}$/is.exec(t);
+	if (invokeCommandMatch) return invokeCommandMatch[1].trim();
+
+	// batch: call <command>
+	const callMatch = /^call\s+(.+)$/is.exec(t);
+	if (callMatch) return callMatch[1].trim();
+
+	return null;
+}
+
+/**
+ * Recursively unwrap all shell wrappers up to DC_MAX_UNWRAP_DEPTH.
+ * Returns the innermost unwrapped command.
+ */
+function dcUnwrapWrappers(cmd: string): string {
+	let current = cmd.trim();
+	for (let depth = 0; depth < DC_MAX_UNWRAP_DEPTH; depth++) {
+		const inner = dcStripOneWrapper(current);
+		if (inner === null || inner === current) break;
+		current = inner.trim();
+	}
+	return current;
+}
+
+/**
+ * Split a compound command into individual segments, splitting on:
+ *   ; && || | newlines
+ * Respects double-quoted strings (does not split inside quotes).
+ * Returns array of trimmed non-empty segments.
+ */
+function dcSplitSegments(cmd: string): string[] {
+	const segments: string[] = [];
+	let current = '';
+	let inDoubleQuote = false;
+	let inSingleQuote = false;
+
+	for (let i = 0; i < cmd.length; i++) {
+		const ch = cmd[i];
+		const next = cmd[i + 1];
+
+		if (ch === '"' && !inSingleQuote) {
+			inDoubleQuote = !inDoubleQuote;
+			current += ch;
+			continue;
+		}
+		if (ch === "'" && !inDoubleQuote) {
+			inSingleQuote = !inSingleQuote;
+			current += ch;
+			continue;
+		}
+
+		if (!inDoubleQuote && !inSingleQuote) {
+			// Check for && or ||
+			if ((ch === '&' && next === '&') || (ch === '|' && next === '|')) {
+				segments.push(current.trim());
+				current = '';
+				i++; // skip second char
+				continue;
+			}
+			// Single | (pipe) or ; or newline
+			if (ch === '|' || ch === ';' || ch === '\n' || ch === '\r') {
+				segments.push(current.trim());
+				current = '';
+				continue;
+			}
+		}
+		current += ch;
+	}
+	if (current.trim()) segments.push(current.trim());
+	return segments.filter((s) => s.length > 0);
+}
+
+/**
+ * Returns true if a path string contains unexpanded environment variable
+ * references that we cannot resolve at check time.
+ */
+function dcHasUnresolvableVars(p: string): boolean {
+	// %VAR% (cmd.exe), $VAR or ${VAR} or $env:VAR (PS/bash)
+	return /(%[A-Za-z_][A-Za-z0-9_]*%|\$\{?[A-Za-z_]|\$env:)/i.test(p);
+}
+
+/**
+ * Returns true if the path looks like a remote/network filesystem path.
+ */
+function dcIsRemotePath(p: string): boolean {
+	return DC_REMOTE_PREFIXES.some((pfx) => p.startsWith(pfx));
+}
+
+/**
+ * Walk from target path up to (but not beyond) cwd using synchronous lstat,
+ * checking each ancestor for symlinks, junctions, or reparse points.
+ *
+ * Returns a block reason string if a suspicious ancestor is found, null otherwise.
+ * Skips silently on ENOENT (target does not exist — nothing to delete).
+ * Fails closed on unexpected lstat errors.
+ */
+function dcLstatAncestorWalk(targetPath: string, cwd: string): string | null {
+	// Normalize separators to the platform convention
+	const normalizedTarget = path.resolve(cwd, targetPath);
+	const normalizedCwd = path.resolve(cwd);
+
+	// Collect ancestor chain from target up to (and including) cwd
+	const ancestors: string[] = [];
+	let current = normalizedTarget;
+	while (true) {
+		ancestors.push(current);
+		const parent = path.dirname(current);
+		if (parent === current) break; // filesystem root
+		// Stop once we've gone past cwd
+		const rel = path.relative(normalizedCwd, current);
+		if (rel === '' || rel.startsWith('..')) break;
+		current = parent;
+	}
+
+	for (const ancestor of ancestors) {
+		let stat: ReturnType<typeof fsSync.lstatSync> | null = null;
+		try {
+			stat = fsSync.lstatSync(ancestor);
+		} catch (err: unknown) {
+			const code = (err as NodeJS.ErrnoException).code;
+			if (code === 'ENOENT') {
+				// Target does not exist — nothing to delete at this point
+				break;
+			}
+			// Unexpected error (EPERM, EACCES, etc.) — fail closed
+			return `lstat failed on "${ancestor}": ${String(err)} — refusing to allow destructive operation on unverifiable path`;
+		}
+
+		if (stat.isSymbolicLink()) {
+			return `BLOCKED: "${ancestor}" is a symlink/junction — deleting recursively through it would destroy the link target. Use platform-specific junction deletion (fsutil reparsepoint delete, Remove-Item without -Recurse) instead.`;
+		}
+	}
+
+	return null; // all clear
+}
+
+/**
+ * Given a set of raw target strings from a destructive command, apply:
+ * 1. Unresolvable-var check (fail closed)
+ * 2. Safe-target allowlist check (allow through)
+ * 3. Remote filesystem check (block)
+ * 4. Unconditional system-path block
+ * 5. lstat ancestor walk (block on symlink/junction in chain)
+ *
+ * Returns a block reason string or null if targets are acceptable.
+ */
+function dcValidateTargets(targets: string[], cwd: string): string | null {
+	for (const raw of targets) {
+		const t = raw.trim().replace(/^["']|["']$/g, '');
+		if (!t || t === '.') continue;
+
+		// Check for unexpanded vars — fail closed (cannot verify safety)
+		if (dcHasUnresolvableVars(t)) {
+			return `BLOCKED: Destructive command targets path with unexpanded variable "${t}" — cannot verify safety. Resolve variables before using destructive operations.`;
+		}
+
+		// Check remote filesystem prefixes
+		if (dcIsRemotePath(t)) {
+			return `BLOCKED: Destructive command targets remote/network filesystem path "${t}" — refusing to execute remote destructive operations.`;
+		}
+
+		// UNC path \\server\share or extended \\?\
+		if (/^\\\\/.test(t)) {
+			return `BLOCKED: Destructive command targets UNC path "${t}" — UNC paths in destructive operations are not allowed.`;
+		}
+
+		// lstat ancestor walk: MUST run before safe-target allowlist.
+		// An LLM can create a junction named "node_modules" (or "dist", etc.) pointing to
+		// important data, then run "rm -rf node_modules". Without this check, the safe-target
+		// allowlist would permit the deletion — this is the K2.6 incident mechanism replayed
+		// with a safe-named junction.
+		const lstatBlock = dcLstatAncestorWalk(t, cwd);
+		if (lstatBlock) return lstatBlock;
+
+		// Safe bare-name targets (after lstat confirms no junction/symlink): skip path checks
+		const basename = path.basename(t);
+		if (t === basename && DC_SAFE_TARGETS.has(t)) {
+			continue; // Allowed — lstat confirmed no junction/symlink in ancestor chain
+		}
+
+		// Filesystem roots — unconditional block
+		if (DC_FS_ROOTS.has(t) || DC_FS_ROOTS.has(t.replace(/\//g, '\\'))) {
+			return `BLOCKED: Destructive command targets filesystem root "${t}"`;
+		}
+
+		// Absolute path: check against blocked system prefixes
+		if (path.isAbsolute(t) || /^[A-Za-z]:/.test(t)) {
+			for (const blocked of DC_BLOCKED_ABSOLUTE_PREFIXES) {
+				if (t.startsWith(blocked)) {
+					return `BLOCKED: Destructive command targets system path "${t}" which is under protected prefix "${blocked}"`;
+				}
+			}
+		}
+	}
+	return null;
+}
+
+/**
+ * Detect Windows junction or symlink CREATION commands.
+ * Junction creation followed by recursive deletion of the junction is the
+ * exact mechanism of the K2.6 data-loss incident.
+ * Block junction/symlink creation where the target resolves outside cwd.
+ *
+ * Patterns covered:
+ *   mklink /J <link> <target>
+ *   mklink /D <link> <target>
+ *   New-Item -ItemType Junction -Path <link> -Target <target>
+ *   New-Item -ItemType SymbolicLink -Path <link> -Target <target>
+ *   ln -s <target> <link>  (when target is outside cwd)
+ */
+function dcCheckJunctionCreation(segment: string, cwd: string): string | null {
+	// mklink /J or /D (cmd.exe)
+	const mklinkMatch =
+		/^mklink(?:\.exe)?\s+\/[JjDd]\s+"?([^"\s]+)"?\s+"?([^"\s]+)"?/i.exec(
+			segment,
+		);
+	if (mklinkMatch) {
+		const target = mklinkMatch[2].trim();
+		if (!dcHasUnresolvableVars(target)) {
+			const resolved = path.resolve(cwd, target);
+			const rel = path.relative(cwd, resolved);
+			if (rel.startsWith('..') || path.isAbsolute(rel)) {
+				return `BLOCKED: Junction/symlink creation targeting path outside working directory: mklink target "${target}" resolves to "${resolved}" which is outside "${cwd}". Creating junctions to external paths and then deleting them recursively can destroy data.`;
+			}
+		}
+		return null; // target is inside cwd — allow
+	}
+
+	// New-Item -ItemType Junction|SymbolicLink (PowerShell)
+	// Parameters are order-independent in PS, so check for -ItemType and -Target independently.
+	const newItemTypeMatch =
+		/New-Item\b.*-ItemType\s+(?:Junction|SymbolicLink|HardLink)\b/i.test(
+			segment,
+		);
+	const newItemTargetMatch = /-Target\s+"?([^"\s;]+)"?/i.exec(segment);
+	const newItemMatch = newItemTypeMatch ? newItemTargetMatch : null;
+	if (newItemMatch) {
+		const target = newItemMatch[1].trim();
+		if (!dcHasUnresolvableVars(target)) {
+			const resolved = path.resolve(cwd, target);
+			const rel = path.relative(cwd, resolved);
+			if (rel.startsWith('..') || path.isAbsolute(rel)) {
+				return `BLOCKED: Junction/symlink creation targeting path outside working directory: New-Item target "${target}" resolves to "${resolved}" which is outside "${cwd}". This pattern caused the K2.6 data-loss incident.`;
+			}
+		}
+		return null;
+	}
+
+	// ln -s <target> (POSIX symlink; block if target resolves outside cwd)
+	// Both absolute and relative targets are checked: ln -s ../sensitive dist escapes cwd.
+	const lnMatch =
+		/^ln\s+(?:-[sfnv]*s[sfnv]*|-s)\s+"?([^"\s]+)"?(?:\s+"?[^"\s]+"?)?\s*$/.exec(
+			segment,
+		);
+	if (lnMatch) {
+		const target = lnMatch[1].trim();
+		if (!dcHasUnresolvableVars(target)) {
+			const resolved = path.resolve(cwd, target);
+			const rel = path.relative(cwd, resolved);
+			if (rel.startsWith('..') || path.isAbsolute(rel)) {
+				return `BLOCKED: Symlink creation targeting path outside working directory: ln -s target "${target}" resolves to "${resolved}" which is outside "${cwd}". Symlinks to external paths combined with recursive deletion can destroy data.`;
+			}
+		}
+		return null;
+	}
+
+	return null;
+}
+
+/**
+ * Extract candidate target paths from a destructive Windows cmd.exe command.
+ * Returns array of path-like arguments.
+ */
+function dcExtractWindowsCmdTargets(segment: string): string[] {
+	// rmdir /s /q <path> or rd /s <path>
+	const rmdirMatch =
+		/^(?:rmdir|rd)(?:\.exe)?\s+(?:\/[sqSQ]\s+)*"?(.+?)"?\s*$/i.exec(segment);
+	if (rmdirMatch) return [rmdirMatch[1].trim()];
+
+	// del /s /q /f <path>
+	const delMatch = /^del(?:\.exe)?\s+(?:\/[sqfSQF]\s+)*"?(.+?)"?\s*$/i.exec(
+		segment,
+	);
+	if (delMatch) return [delMatch[1].trim()];
+
+	return [];
+}
+
+/**
+ * Extract candidate target paths from a destructive PowerShell command.
+ * Handles both `Remove-Item <path> -Recurse` and `Remove-Item -Recurse <path>` orderings.
+ */
+function dcExtractPowerShellTargets(segment: string): string[] {
+	// Strip the leading verb
+	const verbMatch = /^(?:Remove-Item|ri|rm|rmdir|del|erase|rd)\s+/i.exec(
+		segment,
+	);
+	if (!verbMatch) return [];
+	const rest = segment.slice(verbMatch[0].length);
+
+	// Tokenize remainder; quoted strings count as one token
+	const tokens: string[] = rest.match(/"[^"]*"|'[^']*'|[^\s]+/g) ?? [];
+
+	const targets: string[] = [];
+	// Flags that consume the next token as a value
+	const valueFlags = new Set([
+		'-literalpath',
+		'-path',
+		'-filter',
+		'-include',
+		'-exclude',
+		'-lp', // alias for -LiteralPath in PS 7+
+	]);
+	let skipNext = false;
+	for (const tok of tokens) {
+		if (skipNext) {
+			skipNext = false;
+			continue;
+		}
+		if (tok.startsWith('-')) {
+			// Switch-like flags: -Recurse, -Force, -ErrorAction, -WhatIf etc.
+			if (valueFlags.has(tok.toLowerCase())) {
+				skipNext = true; // next token is the flag's value (a path) — capture it
+				// Don't push here; the *next* token IS the target path
+				// Re-enter loop with skipNext=false to capture it
+				const idx = tokens.indexOf(tok);
+				if (idx !== -1 && idx + 1 < tokens.length) {
+					const val = tokens[idx + 1].replace(/^["']|["']$/g, '');
+					if (val) targets.push(val);
+					skipNext = true; // skip the value token on next iteration
+				}
+			}
+			// else: plain switch flag like -Recurse, -Force — skip
+		} else {
+			// Non-flag positional argument → path target
+			const cleaned = tok.replace(/^["']|["']$/g, '');
+			if (cleaned) targets.push(cleaned);
+		}
+	}
+	return targets;
+}
+
+/**
+ * Redacts sensitive values from a shell command string before audit logging.
+ * Covers env-var assignments, CLI flags, Bearer/Basic auth, and -H header flags.
+ * Conservative: only redacts patterns with well-known secret-bearing names.
+ * Export allows unit testing without spinning up a full hooks factory.
+ */
+export function redactShellCommand(cmd: string): string {
+	// Guard against accidental non-string calls (e.g. undefined from missing args).
+	if (typeof cmd !== 'string') return '';
+	// Env-var assignment: TOKEN=abc, SECRET_KEY=abc, PASSWORD=abc, etc.
+	// Matches NAME=value where NAME contains a known sensitive keyword.
+	let out = cmd.replace(
+		/\b([A-Z_]*(?:TOKEN|SECRET|PASSWORD|PASSWD|API[_]?KEY|APIKEY|AUTH|CREDENTIAL|PRIVATE[_]?KEY|ACCESS[_]?KEY)[A-Z_0-9]*)\s*=\s*(\S+)/gi,
+		'$1=[REDACTED]',
+	);
+
+	// CLI flag with = separator: --token=abc, --password=abc
+	out = out.replace(
+		/--([a-zA-Z-]*(?:token|secret|password|passwd|api[_-]?key|apikey|auth|credential|private[_-]?key|access[_-]?key)[a-zA-Z-]*)=(\S+)/gi,
+		'--$1=[REDACTED]',
+	);
+
+	// CLI flag with space separator: --token abc, --password abc
+	// Only match when followed by a non-flag argument (no leading --)
+	out = out.replace(
+		/(--[a-zA-Z-]*(?:token|secret|password|passwd|api[_-]?key|apikey|auth|credential|private[_-]?key|access[_-]?key)[a-zA-Z-]*)(\s+)(?!--)(\S+)/gi,
+		'$1$2[REDACTED]',
+	);
+
+	// Bearer / Basic authorization tokens
+	out = out.replace(
+		/\b(Bearer|Basic)\s+[A-Za-z0-9+/=._-]{4,}/gi,
+		'$1 [REDACTED]',
+	);
+
+	// curl -H "Authorization: <value>" or -H 'X-API-Key: <value>'
+	// Use greedy quantifier (*) so the full token value is consumed before the closing quote,
+	// preventing a non-greedy match from stopping after the first character and leaking fragments.
+	out = out.replace(
+		/(-H\s+['"]?(?:Authorization|X-API-Key|X-Auth-Token):\s*)([^'">\s][^'">\n]*)(['"]?)/gi,
+		'$1[REDACTED]$3',
+	);
+
+	return out;
 }
 
 /**
@@ -340,6 +930,9 @@ export function createGuardrailsHooks(
 
 	// Pre-compute effective authority rules once — authorityConfig is immutable after plugin init
 	const precomputedAuthorityRules = buildEffectiveRules(authorityConfig);
+	// Global deny prefixes — apply to all agents regardless of per-agent rules
+	const universalDenyPrefixes: string[] =
+		authorityConfig?.universal_deny_prefixes ?? [];
 
 	// TypeScript narrowing: guardrailsConfig must be defined if we reach here
 	const cfg = guardrailsConfig!;
@@ -353,94 +946,405 @@ export function createGuardrailsHooks(
 	const requireReviewerAndTestEngineer =
 		cfg.qa_gates?.require_reviewer_test_engineer ?? true;
 
+	// Interpreter gating: undefined means no restriction (all agents allowed).
+	// An explicit empty array blocks ALL agents — this is a misconfiguration
+	// warning documented in the schema.
+	const interpreterAllowedAgents: string[] | undefined =
+		cfg.interpreter_allowed_agents;
+
+	// Shell audit: enabled by default. Always writes to <cwd>/.swarm/session/shell-audit.jsonl.
+	const shellAuditEnabled: boolean = cfg.shell_audit_log ?? true;
+	const shellAuditPath = path.join(
+		effectiveDirectory,
+		'.swarm',
+		'session',
+		'shell-audit.jsonl',
+	);
+
+	/**
+	 * Blocks bash/shell tool calls from agent roles not in interpreter_allowed_agents.
+	 * No-op when interpreter_allowed_agents is undefined (all agents allowed, default).
+	 */
+	function handleInterpreterGating(sessionID: string, tool: string): void {
+		const normalizedTool = normalizeToolName(tool).toLowerCase();
+		if (normalizedTool !== 'bash' && normalizedTool !== 'shell') return;
+		if (!interpreterAllowedAgents) return; // no restriction configured
+
+		const rawAgent = swarmState.activeAgent.get(sessionID);
+		// If no active agent is registered, use 'unknown' — denied unless 'unknown' is listed
+		const agentRole = rawAgent
+			? stripKnownSwarmPrefix(rawAgent).toLowerCase()
+			: 'unknown';
+
+		const allowed = interpreterAllowedAgents.some(
+			(a) => a.toLowerCase() === agentRole,
+		);
+		if (!allowed) {
+			throw new Error(
+				`BLOCKED: Agent "${agentRole}" is not permitted to use the bash/shell interpreter. ` +
+					`Allowed agents: [${interpreterAllowedAgents.map((a) => `"${a}"`).join(', ')}]`,
+			);
+		}
+	}
+
+	/**
+	 * Appends a redacted audit entry to .swarm/session/shell-audit.jsonl.
+	 * Creates the directory if it does not exist.
+	 * Errors are swallowed — audit failures must not block tool execution.
+	 */
+	async function appendShellAuditLog(
+		sessionID: string,
+		tool: string,
+		args: unknown,
+	): Promise<void> {
+		if (!shellAuditEnabled) return;
+		const normalizedAuditTool = normalizeToolName(tool).toLowerCase();
+		if (normalizedAuditTool !== 'bash' && normalizedAuditTool !== 'shell')
+			return;
+
+		const bashArgs = args as Record<string, unknown> | undefined;
+		const rawCmd =
+			typeof bashArgs?.command === 'string' ? bashArgs.command : '';
+		const redacted = redactShellCommand(rawCmd);
+
+		const rawAgent = swarmState.activeAgent.get(sessionID);
+		const agentRole = rawAgent ? stripKnownSwarmPrefix(rawAgent) : 'unknown';
+
+		const entry = JSON.stringify({
+			ts: new Date().toISOString(),
+			sessionID,
+			agent: agentRole,
+			tool,
+			command: redacted,
+		});
+
+		try {
+			await fs.mkdir(path.dirname(shellAuditPath), { recursive: true });
+			await fs.appendFile(shellAuditPath, `${entry}\n`, 'utf-8');
+		} catch {
+			// Intentionally swallowed — audit failures must never block shell execution
+		}
+	}
+
 	/**
 	 * Check if a bash/shell command is potentially destructive and should be blocked.
 	 * Only active when block_destructive_commands is not false.
+	 *
+	 * PR A: Extended with cross-platform coverage:
+	 *   - Windows cmd.exe: rmdir /s, rd /s, del /s /q, ransomware-grade commands
+	 *   - PowerShell: Remove-Item -Recurse and all PS aliases, -EncodedCommand
+	 *   - Shell wrapper unwrapping: cmd /c, powershell -Command, bash -c, sudo, wsl, iex
+	 *   - Normalization: NFKC, caret-escape, backtick-escape, quote-splicing
+	 *   - Runtime lstat-ancestor-walk on destructive targets
+	 *   - Junction/symlink creation with external targets
+	 *   - Remote filesystem path rejection
+	 *   - POSIX long-form flags (--recursive --force)
 	 */
 	function checkDestructiveCommand(tool: string, args: unknown): void {
 		if (tool !== 'bash' && tool !== 'shell') return;
 		if (cfg.block_destructive_commands === false) return;
 		const toolArgs = args as Record<string, unknown> | undefined;
-		const command =
+		const rawCommand =
 			typeof toolArgs?.command === 'string' ? toolArgs.command.trim() : '';
-		if (!command) return;
+		if (!rawCommand) return;
 
-		// Fork bomb patterns
+		const cwd = effectiveDirectory;
+
+		// --- Normalize the top-level command (NFKC + evasion collapse) ---
+		const command = dcNormalizeCommand(rawCommand);
+
+		// --- Fork bomb: check on whole command BEFORE splitting (splits break the pattern) ---
 		if (/:\s*\(\s*\)\s*\{[^}]*\|[^}]*:/.test(command)) {
 			throw new Error(
 				`BLOCKED: Potentially destructive shell command detected: fork bomb pattern`,
 			);
 		}
 
-		// rm -rf / rm -r -f with non-safe paths
-		const rmFlagPattern = /^rm\s+(-r\s+-f|-f\s+-r|-rf|-fr)\s+(.+)$/;
-		const rmMatch = rmFlagPattern.exec(command);
-		if (rmMatch) {
-			const targetPart = rmMatch[2].trim();
-			const targets = targetPart.split(/\s+/);
-			const safeTargets = /^(node_modules|\.git)$/;
-			const allSafe = targets.every((t) => safeTargets.test(t));
-			if (!allSafe) {
+		// --- Unwrap all shell wrappers to the innermost command ---
+		const unwrapped = dcUnwrapWrappers(command);
+
+		// --- Split compound command into segments ---
+		// We check both the outer (post-norm) and the innermost (post-unwrap) form
+		const outerSegments = dcSplitSegments(command);
+		const innerSegments = dcSplitSegments(unwrapped);
+		// Per-segment unwrapping: handles wrappers embedded inside compound commands,
+		// e.g. "echo hello && powershell -c 'Remove-Item -Recurse C:\target'"
+		const perSegmentUnwrapped = outerSegments.map((s) => dcUnwrapWrappers(s));
+		// Deduplicate while preserving order
+		const allSegments = [
+			...new Set([...outerSegments, ...innerSegments, ...perSegmentUnwrapped]),
+		];
+
+		for (const segment of allSegments) {
+			const seg = segment.trim();
+			if (!seg) continue;
+
+			// ----------------------------------------------------------------
+			// 2. Junction/symlink CREATION with out-of-cwd target
+			//    (must check before deletion patterns; creation is the setup step)
+			// ----------------------------------------------------------------
+			const junctionBlock = dcCheckJunctionCreation(seg, cwd);
+			if (junctionBlock) throw new Error(junctionBlock);
+
+			// ----------------------------------------------------------------
+			// 3. POSIX rm — short flags (-rf, -fr, -r -f) and long flags
+			// ----------------------------------------------------------------
+			const rmShortMatch =
+				/^rm\s+(-[rRfF]+(?:\s+-[rRfF]+)*|-r\s+-f|-f\s+-r)\s+(.+)$/.exec(seg);
+			const rmLongMatch = /^rm\s+(?:--(?:recursive|force)\s+){1,2}(.+)$/.exec(
+				seg,
+			);
+			const rmAnyMatch = rmShortMatch ?? rmLongMatch;
+			if (rmAnyMatch) {
+				const targetPart = rmAnyMatch[rmShortMatch ? 2 : 1].trim();
+				const targets = targetPart.split(/\s+/);
+				// Always validate — dcValidateTargets runs lstat even for safe-named targets
+				const validateBlock = dcValidateTargets(targets, cwd);
+				if (validateBlock) throw new Error(validateBlock);
+				const allSafe = targets.every((t) =>
+					DC_SAFE_TARGETS.has(t.replace(/^["']|["']$/g, '').trim()),
+				);
+				if (!allSafe) {
+					throw new Error(
+						`BLOCKED: Potentially destructive shell command: rm with recursive/force flags on unsafe path(s): ${targetPart}`,
+					);
+				}
+			}
+
+			// ----------------------------------------------------------------
+			// 4. Windows cmd.exe: rmdir /s, rd /s
+			// ----------------------------------------------------------------
+			if (/^(?:rmdir|rd)(?:\.exe)?\s+.*\/[sS]/i.test(seg)) {
+				const targets = dcExtractWindowsCmdTargets(seg);
+				if (targets.length === 0) {
+					// Cannot extract target — fail closed
+					throw new Error(
+						`BLOCKED: Windows recursive directory delete (rmdir /s or rd /s) detected. Verify the target is not a junction/symlink.`,
+					);
+				}
+				// Always validate — dcValidateTargets runs lstat even for safe-named targets
+				const validateBlock = dcValidateTargets(targets, cwd);
+				if (validateBlock) throw new Error(validateBlock);
+				const allSafe = targets.every((t) => DC_SAFE_TARGETS.has(t.trim()));
+				if (!allSafe) {
+					throw new Error(
+						`BLOCKED: Windows recursive directory delete on unsafe path(s): ${targets.join(', ')}`,
+					);
+				}
+			}
+
+			// ----------------------------------------------------------------
+			// 5. Windows cmd.exe: del /s /q /f
+			// ----------------------------------------------------------------
+			if (/^del(?:\.exe)?\s+.*\/[sS]/i.test(seg)) {
+				const targets = dcExtractWindowsCmdTargets(seg);
+				if (targets.length > 0) {
+					// Always validate — dcValidateTargets runs lstat even for safe-named targets
+					const validateBlock = dcValidateTargets(targets, cwd);
+					if (validateBlock) throw new Error(validateBlock);
+					const allSafe = targets.every((t) => DC_SAFE_TARGETS.has(t.trim()));
+					if (!allSafe) {
+						throw new Error(
+							`BLOCKED: Windows recursive file delete (del /s) on unsafe path(s): ${targets.join(', ')}`,
+						);
+					}
+				}
+			}
+
+			// ----------------------------------------------------------------
+			// 6. PowerShell: Remove-Item / aliases with -Recurse
+			// ----------------------------------------------------------------
+			if (
+				/^(?:Remove-Item|ri|rm|rmdir|del|erase|rd)\b.*-[Rr]ecurse\b/i.test(
+					seg,
+				) ||
+				/^(?:Remove-Item|ri|rm|rmdir|del|erase|rd)\b.*-[Rr]\b/i.test(seg)
+			) {
+				const targets = dcExtractPowerShellTargets(seg);
+				if (targets.length > 0) {
+					// Always validate — dcValidateTargets runs lstat even for safe-named targets
+					const validateBlock = dcValidateTargets(targets, cwd);
+					if (validateBlock) throw new Error(validateBlock);
+					const allSafe = targets.every((t) => DC_SAFE_TARGETS.has(t.trim()));
+					if (!allSafe) {
+						throw new Error(
+							`BLOCKED: PowerShell recursive delete on unsafe path(s): ${targets.join(', ')}`,
+						);
+					}
+				} else {
+					throw new Error(
+						`BLOCKED: PowerShell Remove-Item with -Recurse detected — cannot verify target safety`,
+					);
+				}
+			}
+
+			// ----------------------------------------------------------------
+			// 7. PowerShell: Get-ChildItem | Remove-Item -Recurse (pipe form)
+			// ----------------------------------------------------------------
+			if (
+				/Get-ChildItem\b.*\|\s*Remove-Item\b.*-[Rr]ecurse/i.test(seg) ||
+				/gci\b.*\|\s*ri\b.*-[Rr]ecurse/i.test(seg)
+			) {
 				throw new Error(
-					`BLOCKED: Potentially destructive shell command: rm -rf on unsafe path(s): ${targetPart}`,
+					`BLOCKED: PowerShell pipeline "Get-ChildItem | Remove-Item -Recurse" detected — verify target safety and avoid recursive deletion through symlinks/junctions`,
 				);
 			}
-		}
 
-		// git push --force or -f
-		if (/^git\s+push\b.*?(--force|-f)\b/.test(command)) {
-			throw new Error(
-				`BLOCKED: Force push detected — git push --force is not allowed`,
-			);
-		}
+			// ----------------------------------------------------------------
+			// 8. Ransomware-grade / disk-level destruction
+			// ----------------------------------------------------------------
+			if (/^vssadmin(?:\.exe)?\s+delete\b/i.test(seg)) {
+				throw new Error(
+					`BLOCKED: "vssadmin delete" detected — deletes Volume Shadow Copies (ransomware-grade operation)`,
+				);
+			}
+			if (/^wbadmin(?:\.exe)?\s+delete\b/i.test(seg)) {
+				throw new Error(
+					`BLOCKED: "wbadmin delete" detected — deletes Windows backup catalog (ransomware-grade operation)`,
+				);
+			}
+			if (/^diskpart(?:\.exe)?$/i.test(seg)) {
+				throw new Error(
+					`BLOCKED: "diskpart" detected — interactive disk partitioning tool`,
+				);
+			}
+			if (/^bcdedit(?:\.exe)?\s+\/delete\b/i.test(seg)) {
+				throw new Error(
+					`BLOCKED: "bcdedit /delete" detected — modifies Windows boot configuration`,
+				);
+			}
+			if (/^sdelete(?:\.exe)?\s+/i.test(seg)) {
+				throw new Error(
+					`BLOCKED: "sdelete" detected — secure file deletion (Sysinternals)`,
+				);
+			}
+			if (
+				/^fsutil(?:\.exe)?\s+reparsepoint\s+delete\b/i.test(seg) ||
+				/^fsutil(?:\.exe)?\s+file\s+setzerodata\b/i.test(seg)
+			) {
+				throw new Error(`BLOCKED: "fsutil" destructive subcommand detected`);
+			}
+			if (/^takeown(?:\.exe)?\s+.*\/[rR]\b/i.test(seg)) {
+				throw new Error(
+					`BLOCKED: "takeown /R" (recursive ownership takeover) detected — often precedes destructive operations`,
+				);
+			}
+			if (/^cipher(?:\.exe)?\s+\/[wW]\b/i.test(seg)) {
+				throw new Error(
+					`BLOCKED: "cipher /w" detected — overwrites free disk space (data wipe operation)`,
+				);
+			}
+			if (/^format\s+[A-Za-z]:/i.test(seg)) {
+				throw new Error(`BLOCKED: Windows disk format command detected`);
+			}
+			if (/^robocopy(?:\.exe)?\s+.*\/(?:MIR|mir)\b/.test(seg)) {
+				throw new Error(
+					`BLOCKED: "robocopy /MIR" (mirror) detected — can delete files in the destination that don't exist in the source`,
+				);
+			}
 
-		// git reset --hard
-		if (/^git\s+reset\s+--hard/.test(command)) {
-			throw new Error(
-				`BLOCKED: "git reset --hard" detected — use --soft or --mixed with caution`,
-			);
-		}
+			// ----------------------------------------------------------------
+			// 9. POSIX: chmod/chattr/icacls denial-of-service patterns
+			// ----------------------------------------------------------------
+			if (/^chmod\s+.*-[rR]\b.*000\b/.test(seg)) {
+				throw new Error(
+					`BLOCKED: "chmod -R 000" detected — removes all permissions recursively`,
+				);
+			}
+			if (/^chattr\s+.*\+i\b/.test(seg)) {
+				throw new Error(
+					`BLOCKED: "chattr +i" detected — makes files immutable`,
+				);
+			}
+			if (/^icacls(?:\.exe)?\s+.*\/deny\b/i.test(seg)) {
+				throw new Error(
+					`BLOCKED: "icacls /deny" detected — denies filesystem permissions`,
+				);
+			}
 
-		// git reset --mixed with target commit
-		if (/^git\s+reset\s+--mixed\s+\S+/.test(command)) {
-			throw new Error(
-				`BLOCKED: "git reset --mixed" with a target branch/commit is not allowed`,
-			);
-		}
+			// ----------------------------------------------------------------
+			// 10. dd data-wipe patterns
+			// ----------------------------------------------------------------
+			if (/^dd\b.*\bif=\/dev\/(zero|null|urandom)\b/.test(seg)) {
+				throw new Error(
+					`BLOCKED: "dd" with /dev/zero, /dev/null, or /dev/urandom as input detected — data wipe operation`,
+				);
+			}
 
-		// kubectl delete
-		if (/^kubectl\s+delete\b/.test(command)) {
-			throw new Error(
-				`BLOCKED: "kubectl delete" detected — destructive cluster operation`,
-			);
-		}
+			// ----------------------------------------------------------------
+			// 11. Git destructive operations
+			// ----------------------------------------------------------------
+			if (/^git\s+push\b.*?(--force|-f)\b/.test(seg)) {
+				throw new Error(
+					`BLOCKED: Force push detected — git push --force is not allowed`,
+				);
+			}
+			if (/^git\s+reset\s+--hard/.test(seg)) {
+				throw new Error(
+					`BLOCKED: "git reset --hard" detected — use --soft or --mixed with caution`,
+				);
+			}
+			if (/^git\s+reset\s+--mixed\s+\S+/.test(seg)) {
+				throw new Error(
+					`BLOCKED: "git reset --mixed" with a target branch/commit is not allowed`,
+				);
+			}
+			if (/^git\s+clean\s+.*-[fF].*[dD]/.test(seg)) {
+				throw new Error(
+					`BLOCKED: "git clean -fd" detected — permanently deletes untracked files and directories`,
+				);
+			}
+			if (/^git\s+worktree\s+remove\s+.*--force\b/i.test(seg)) {
+				throw new Error(
+					`BLOCKED: "git worktree remove --force" detected — can delete working tree contents`,
+				);
+			}
 
-		// docker system prune
-		if (/^docker\s+system\s+prune\b/.test(command)) {
-			throw new Error(
-				`BLOCKED: "docker system prune" detected — destructive container operation`,
-			);
-		}
+			// ----------------------------------------------------------------
+			// 12. rsync mirror / sync with delete
+			// ----------------------------------------------------------------
+			if (/^rsync\b.*--delete(?:-after|-before|-during|-delay)?\b/.test(seg)) {
+				throw new Error(
+					`BLOCKED: "rsync --delete" detected — can delete files in the destination. Verify source is not empty.`,
+				);
+			}
 
-		// SQL DROP TABLE/DATABASE/SCHEMA
-		if (/^\s*DROP\s+(TABLE|DATABASE|SCHEMA)\b/i.test(command)) {
-			throw new Error(
-				`BLOCKED: SQL DROP command detected — destructive database operation`,
-			);
-		}
+			// ----------------------------------------------------------------
+			// 13. kubectl / docker (existing patterns preserved)
+			// ----------------------------------------------------------------
+			if (/^kubectl\s+delete\b/.test(seg)) {
+				throw new Error(
+					`BLOCKED: "kubectl delete" detected — destructive cluster operation`,
+				);
+			}
+			if (/^docker\s+system\s+prune\b/.test(seg)) {
+				throw new Error(
+					`BLOCKED: "docker system prune" detected — destructive container operation`,
+				);
+			}
 
-		// SQL TRUNCATE TABLE
-		if (/^\s*TRUNCATE\s+TABLE\b/i.test(command)) {
-			throw new Error(
-				`BLOCKED: SQL TRUNCATE command detected — destructive database operation`,
-			);
-		}
+			// ----------------------------------------------------------------
+			// 14. SQL DDL (existing patterns preserved)
+			// ----------------------------------------------------------------
+			if (/^\s*DROP\s+(TABLE|DATABASE|SCHEMA)\b/i.test(seg)) {
+				throw new Error(
+					`BLOCKED: SQL DROP command detected — destructive database operation`,
+				);
+			}
+			if (/^\s*TRUNCATE\s+TABLE\b/i.test(seg)) {
+				throw new Error(
+					`BLOCKED: SQL TRUNCATE command detected — destructive database operation`,
+				);
+			}
 
-		// mkfs disk format
-		if (/^mkfs[./]/.test(command)) {
-			throw new Error(
-				`BLOCKED: Disk format command (mkfs) detected — disk formatting operation`,
-			);
+			// ----------------------------------------------------------------
+			// 15. Disk format (existing mkfs + new format X:)
+			// ----------------------------------------------------------------
+			if (/^mkfs[./]/.test(seg)) {
+				throw new Error(
+					`BLOCKED: Disk format command (mkfs) detected — disk formatting operation`,
+				);
+			}
 		}
 	}
 
@@ -603,6 +1507,29 @@ export function createGuardrailsHooks(
 	}
 
 	/**
+	 * v6.70.0 gap-closure (#496): resolve declared coder scope from either
+	 * `session.declaredCoderScope` (primary) or the per-task fallback map
+	 * (`pendingCoderScopeByTaskId`). Used by all four `checkFileAuthorityWithRules`
+	 * call sites so delegated writes and transparent writes honour declared scope
+	 * identically.
+	 *
+	 * v6.71.1 (#519) extends the fallback chain with disk persistence and
+	 * plan-as-scope so scope survives cross-process delegation and architect
+	 * plans become a durable scope source. Order: in-memory → `.swarm/scopes/`
+	 * → `.swarm/plan.json:files_touched` → pending-map. First non-empty wins.
+	 */
+	function resolveDeclaredScope(sessionID: string): string[] | null {
+		const session = swarmState.agentSessions.get(sessionID);
+		const taskId = session?.currentTaskId ?? null;
+		return resolveScopeWithFallbacks({
+			directory: effectiveDirectory,
+			taskId,
+			inMemoryScope: session?.declaredCoderScope,
+			pendingMapScope: taskId ? pendingCoderScopeByTaskId.get(taskId) : null,
+		});
+	}
+
+	/**
 	 * Handles delegated write tracking and coder delegation reset.
 	 * MUST be called first — before any exemptions.
 	 */
@@ -622,11 +1549,16 @@ export function createGuardrailsHooks(
 				if (typeof delegTargetPath === 'string' && delegTargetPath.length > 0) {
 					const agentName = swarmState.activeAgent.get(sessionID) ?? 'unknown';
 					const cwd = effectiveDirectory;
+					// v6.70.0 gap-closure (#496): honour declared scope on delegated
+					// writes too, not just the transparent path. Without this, the
+					// primary architect→coder workflow still blocks Rails/Python/Go
+					// paths declared via `declare_scope`.
 					const authorityCheck = checkFileAuthorityWithRules(
 						agentName,
 						delegTargetPath,
 						cwd,
 						precomputedAuthorityRules,
+						{ declaredScope: resolveDeclaredScope(sessionID) },
 					);
 					if (!authorityCheck.allowed) {
 						throw new Error(
@@ -645,11 +1577,15 @@ export function createGuardrailsHooks(
 				const agentName = swarmState.activeAgent.get(sessionID) ?? 'unknown';
 				const cwd = effectiveDirectory;
 				for (const p of extractPatchTargetPaths(tool, args)) {
+					// v6.70.0 gap-closure (#496): same reasoning as Write/Edit above —
+					// declared scope must flow into patch authority checks on the
+					// delegated-write path.
 					const authorityCheck = checkFileAuthorityWithRules(
 						agentName,
 						p,
 						cwd,
 						precomputedAuthorityRules,
+						{ declaredScope: resolveDeclaredScope(sessionID) },
 					);
 					if (!authorityCheck.allowed) {
 						throw new Error(
@@ -1072,14 +2008,24 @@ export function createGuardrailsHooks(
 			// Block full test suite execution without file argument
 			handleTestSuiteBlocking(input.tool, output.args);
 
+			// Shell audit log: runs BEFORE enforcement so blocked attempts are also recorded.
+			// Errors are swallowed — audit failures must never block execution.
+			await appendShellAuditLog(input.sessionID, input.tool, output.args);
+
+			// Interpreter gating: block bash/shell calls from disallowed agent roles.
+			// Runs after audit so denied attempts appear in the audit trail.
+			handleInterpreterGating(input.sessionID, input.tool);
+
 			// Block destructive shell commands (rm -rf, force push, kubectl delete, etc.)
 			checkDestructiveCommand(input.tool, output.args);
 
-			// Plan state + scope protection for architect writes
+			// Plan state + scope protection — architect-only
 			if (isArchitect(input.sessionID) && isWriteTool(input.tool)) {
 				handlePlanAndScopeProtection(input.sessionID, input.tool, output.args);
+			}
 
-				// Architect direct write authority check
+			// Authority + lstat + universal-deny checks for ALL agents on Write/Edit
+			if (isWriteTool(input.tool)) {
 				const toolArgs = output.args as Record<string, unknown> | undefined;
 				const targetPath =
 					toolArgs?.filePath ??
@@ -1087,13 +2033,57 @@ export function createGuardrailsHooks(
 					toolArgs?.file ??
 					toolArgs?.target;
 				if (typeof targetPath === 'string' && targetPath.length > 0) {
-					const agentName =
-						swarmState.activeAgent.get(input.sessionID) ?? 'architect';
+					// lstat: block writes through symlinks (prevents scope-escape via junction)
+					const lstatBlock = checkWriteTargetForSymlink(
+						targetPath,
+						effectiveDirectory,
+					);
+					if (lstatBlock) {
+						throw new Error(lstatBlock);
+					}
+
+					// Fail closed if no active agent is registered for this session.
+					// Defaulting to 'architect' would grant broad write permissions to
+					// unknown sessions; instead we block until the session is identified.
+					const agentName = swarmState.activeAgent.get(input.sessionID);
+					if (!agentName) {
+						throw new Error(
+							`WRITE BLOCKED: No active agent registered for session "${input.sessionID}". Call startAgentSession before issuing write tool calls.`,
+						);
+					}
+
+					// Universal deny prefixes — applies to all agents before per-agent rules
+					if (universalDenyPrefixes.length > 0) {
+						const normalizedPath = path
+							.relative(
+								path.resolve(effectiveDirectory),
+								path.resolve(effectiveDirectory, targetPath),
+							)
+							.replace(/\\/g, '/');
+						for (const prefix of universalDenyPrefixes) {
+							if (
+								normalizedPath.toLowerCase().startsWith(prefix.toLowerCase())
+							) {
+								throw new Error(
+									`WRITE BLOCKED: Agent "${agentName}" is not authorised to write "${targetPath}". Reason: Path is under universal deny prefix "${prefix}"`,
+								);
+							}
+						}
+					}
+
+					// v6.70.0 (#496): resolve declared scope so the authority check can
+					// honour architect-declared paths that fall outside the agent's
+					// hardcoded allowedPrefix (e.g. Rails `config/`, `app/`).
+					// Shared with the delegated-write path via `resolveDeclaredScope`.
+					const writeDeclaredScope = resolveDeclaredScope(input.sessionID);
+
+					// Per-agent authority check — applies to all agents
 					const authorityCheck = checkFileAuthorityWithRules(
 						agentName,
 						targetPath,
 						effectiveDirectory,
 						precomputedAuthorityRules,
+						{ declaredScope: writeDeclaredScope },
 					);
 					if (!authorityCheck.allowed) {
 						throw new Error(
@@ -1102,19 +2092,56 @@ export function createGuardrailsHooks(
 					}
 				}
 			}
+
+			// Authority + lstat + universal-deny for apply_patch / patch
 			if (input.tool === 'apply_patch' || input.tool === 'patch') {
-				const agentName =
-					swarmState.activeAgent.get(input.sessionID) ?? 'architect';
+				// Fail closed if no active agent is registered (same as Write/Edit path above)
+				const patchAgentName = swarmState.activeAgent.get(input.sessionID);
+				if (!patchAgentName) {
+					throw new Error(
+						`WRITE BLOCKED: No active agent registered for session "${input.sessionID}". Call startAgentSession before issuing write tool calls.`,
+					);
+				}
 				for (const p of extractPatchTargetPaths(input.tool, output.args)) {
+					// lstat: block patches through symlinks
+					const lstatBlock = checkWriteTargetForSymlink(p, effectiveDirectory);
+					if (lstatBlock) {
+						throw new Error(lstatBlock);
+					}
+
+					// Universal deny prefixes for patches (case-insensitive)
+					if (universalDenyPrefixes.length > 0) {
+						const normalizedP = path
+							.relative(
+								path.resolve(effectiveDirectory),
+								path.resolve(effectiveDirectory, p),
+							)
+							.replace(/\\/g, '/');
+						for (const prefix of universalDenyPrefixes) {
+							if (normalizedP.toLowerCase().startsWith(prefix.toLowerCase())) {
+								throw new Error(
+									`WRITE BLOCKED: Agent "${patchAgentName}" is not authorised to write "${p}" (via patch). Reason: Path is under universal deny prefix "${prefix}"`,
+								);
+							}
+						}
+					}
+
+					// v6.70.0 (#496): resolve declared scope for apply_patch path (see
+					// Write/Edit path above for rationale).
+					// Shared with the delegated-write path via `resolveDeclaredScope`.
+					const patchDeclaredScope = resolveDeclaredScope(input.sessionID);
+
+					// Per-agent authority check for patches
 					const authorityCheck = checkFileAuthorityWithRules(
-						agentName,
+						patchAgentName,
 						p,
 						effectiveDirectory,
 						precomputedAuthorityRules,
+						{ declaredScope: patchDeclaredScope },
 					);
 					if (!authorityCheck.allowed) {
 						throw new Error(
-							`WRITE BLOCKED: Agent "${agentName}" is not authorised to write "${p}" (via patch). Reason: ${authorityCheck.reason}`,
+							`WRITE BLOCKED: Agent "${patchAgentName}" is not authorised to write "${p}" (via patch). Reason: ${authorityCheck.reason}`,
 						);
 					}
 				}
@@ -2217,7 +3244,6 @@ export const DEFAULT_AGENT_AUTHORITY_RULES: Record<string, AgentRule> = {
 	},
 	coder: {
 		blockedPrefix: ['.swarm/'],
-		allowedPrefix: ['src/', 'tests/', 'docs/', 'scripts/'],
 		blockedZones: ['generated', 'config'],
 	},
 	reviewer: {
@@ -2251,6 +3277,63 @@ export const DEFAULT_AGENT_AUTHORITY_RULES: Record<string, AgentRule> = {
 		blockedZones: ['generated'],
 	},
 };
+
+/**
+ * Checks whether a write target path (or any ancestor strictly inside cwd)
+ * is a symlink. Writing through a symlink can redirect the write to a
+ * location outside the working directory, bypassing scope containment.
+ *
+ * The walk stops at cwd — cwd itself is NOT lstat'd. A user's chosen
+ * working directory may legitimately be reached via a symlink (e.g.,
+ * macOS's /tmp → /private/tmp), and that symlink does not constitute a
+ * redirect *within* the workspace. Only attacker-plantable symlinks
+ * BELOW cwd are relevant to this guard.
+ *
+ * ENOENT on any node in the chain is allowed — the file/dir doesn't exist yet.
+ * Any other lstat error (EPERM, EACCES, ENAMETOOLONG, …) fails closed:
+ * an unverifiable ancestor must not be written through, even if the OS
+ * would eventually reject the write. Defense-in-depth over optimism.
+ *
+ * @returns A block reason string if a symlink is detected, null if all clear.
+ */
+export function checkWriteTargetForSymlink(
+	targetPath: string,
+	cwd: string,
+): string | null {
+	const normalizedCwd = path.resolve(cwd);
+	const normalizedTarget = path.resolve(cwd, targetPath);
+
+	// Walk ancestor chain from target up to (but NOT including) cwd.
+	const ancestors: string[] = [];
+	let current = normalizedTarget;
+	while (true) {
+		const rel = path.relative(normalizedCwd, current);
+		// Stop at cwd (rel === '') or as soon as we leave cwd (starts with '..').
+		// Do NOT push cwd itself onto the ancestor list — see function docstring.
+		if (rel === '' || rel.startsWith('..')) break;
+		ancestors.push(current);
+		const parent = path.dirname(current);
+		if (parent === current) break; // filesystem root
+		current = parent;
+	}
+
+	for (const ancestor of ancestors) {
+		let stat: ReturnType<typeof fsSync.lstatSync> | null = null;
+		try {
+			stat = fsSync.lstatSync(ancestor);
+		} catch (err: unknown) {
+			const code = (err as NodeJS.ErrnoException).code;
+			if (code === 'ENOENT') continue; // not yet created — OK for writes
+			// Unexpected error: fail closed
+			return `WRITE BLOCKED: lstat failed on "${ancestor}": ${String(err)} — refusing write on unverifiable path`;
+		}
+		if (stat.isSymbolicLink()) {
+			return `WRITE BLOCKED: "${ancestor}" is a symlink — writing through a symlink could redirect the write outside the working directory`;
+		}
+	}
+
+	return null; // all clear
+}
 
 /**
  * Builds the effective rules map by merging user-configured rules with defaults.
@@ -2289,6 +3372,26 @@ function buildEffectiveRules(
 }
 
 /**
+ * Returns true when `targetAbsolute` and `cwdAbsolute` resolve to different
+ * filesystem roots. On POSIX this is always false (single root `/`); on
+ * Windows it is true when the two paths sit on different drive letters or
+ * different UNC roots — the symptom Codex flagged on PR #501, where
+ * `path.relative('C:\\repo', 'D:\\secret.txt')` returns the absolute
+ * `'D:\\secret.txt'` and slips past `startsWith('../')` containment.
+ *
+ * Exposed (and accepts an injectable `pathLib`) so the cross-drive guard
+ * is falsifiable on Linux CI without depending on a Windows runner: tests
+ * pass `path.win32` / `path.posix` directly.
+ */
+export function isOnDifferentFilesystemRoot(
+	targetAbsolute: string,
+	cwdAbsolute: string,
+	pathLib: Pick<typeof path, 'parse'> = path,
+): boolean {
+	return pathLib.parse(targetAbsolute).root !== pathLib.parse(cwdAbsolute).root;
+}
+
+/**
  * Checks file path authority against a pre-computed rules map.
  * Implements DENY-first evaluation order:
  * 1. readOnly - blocks all writes
@@ -2305,6 +3408,7 @@ function checkFileAuthorityWithRules(
 	filePath: string,
 	cwd: string,
 	effectiveRules: Record<string, AgentRule>,
+	options?: { declaredScope?: string[] | null },
 ): { allowed: true } | { allowed: false; reason: string; zone?: FileZone } {
 	const normalizedAgent = agentName.toLowerCase();
 	const strippedAgent = stripKnownSwarmPrefix(agentName).toLowerCase();
@@ -2318,13 +3422,43 @@ function checkFileAuthorityWithRules(
 	// Single normalization call using normalizePathWithCache for consistent security
 	// This resolves symlinks and normalizes paths the same way for ALL checks
 	let normalizedPath: string;
+	let resolvedTarget: string;
 	try {
 		const normalizedWithSymlinks = normalizePathWithCache(filePath, dir);
-		const resolved = path.resolve(dir, normalizedWithSymlinks);
-		normalizedPath = path.relative(dir, resolved).replace(/\\/g, '/');
+		resolvedTarget = path.resolve(dir, normalizedWithSymlinks);
+		normalizedPath = path.relative(dir, resolvedTarget).replace(/\\/g, '/');
 	} catch {
-		const resolved = path.resolve(dir, filePath);
-		normalizedPath = path.relative(dir, resolved).replace(/\\/g, '/');
+		resolvedTarget = path.resolve(dir, filePath);
+		normalizedPath = path.relative(dir, resolvedTarget).replace(/\\/g, '/');
+	}
+
+	// Containment check (applies to all agents): reject paths that resolve
+	// outside the working directory. Previously this was implicitly enforced
+	// by the hardcoded relative allowedPrefix whitelist; removing that
+	// whitelist (v6.70.0 #496 final) required making containment explicit.
+	// Any path whose resolved location escapes cwd — via an absolute path
+	// like "/etc/passwd" or a traversal like "../../etc/passwd" — is rejected
+	// here regardless of agent rules. This is defense-in-depth and applies
+	// even to architect (which never had an allowedPrefix).
+	//
+	// v6.70.0 post-Codex-review: also reject cross-drive / cross-root
+	// targets. On Windows, `path.relative('C:/repo', 'D:/secret.txt')`
+	// returns `"D:\\secret.txt"` — an absolute drive-letter path that does
+	// NOT start with `..` and therefore would slip past the traversal check
+	// below. Comparing filesystem roots catches this universally: POSIX
+	// systems only have root `/`, so roots only differ when the target is
+	// on a different Windows drive.
+	if (isOnDifferentFilesystemRoot(resolvedTarget, dir)) {
+		return {
+			allowed: false,
+			reason: `Path blocked: ${filePath} is on a different drive/root than the working directory`,
+		};
+	}
+	if (normalizedPath === '..' || normalizedPath.startsWith('../')) {
+		return {
+			allowed: false,
+			reason: `Path blocked: ${normalizedPath} resolves outside the working directory`,
+		};
 	}
 
 	const rules =
@@ -2401,23 +3535,54 @@ function checkFileAuthorityWithRules(
 	}
 
 	// Step 7: allowedPrefix - prefix-based allow (whitelist model)
-	// If configured, only paths starting with these prefixes are allowed
-	if (rules.allowedPrefix != null && rules.allowedPrefix.length > 0) {
-		const isAllowed = rules.allowedPrefix.some((prefix) =>
-			normalizedPath.startsWith(prefix),
-		);
-		if (!isAllowed) {
+	// If configured, only paths starting with these prefixes are allowed.
+	//
+	// v6.70.0 (#496): If the architect has declared an explicit scope via the
+	// `declare_scope` tool, paths inside that scope bypass the hardcoded
+	// allowedPrefix whitelist. This lets the architect authorise framework-agnostic
+	// paths (Rails `config/`, `app/`, `db/`; Python `module/`, `pyproject.toml`; etc.)
+	// without editing the default rule set.
+	//
+	// SECURITY: declaredScope ONLY relaxes allowedPrefix (Step 7). All DENY rules
+	// (readOnly, blockedExact, blockedGlobs, blockedPrefix, blockedZones) and
+	// universal_deny_prefixes (checked upstream in toolBefore) remain fully
+	// enforced. A declared scope cannot grant writes into .env, .git/, secrets/,
+	// or any blocked path.
+	//
+	// v6.70.0 post-Codex-review: declaredScope is the architect→coder hand-off
+	// channel ONLY. Honouring it for other roles (docs, designer, reviewer,
+	// test_engineer, critic) would let an architect's coder authorisation leak
+	// into other agents' write capabilities — e.g., declaring `src/foo.ts` for
+	// the coder would also let `docs` write into `src/`, breaking per-agent
+	// isolation. Restrict the bypass to coder agents (canonical or prefixed
+	// like `local_coder` / `paid_coder`).
+	const isCoderAgent = normalizedAgent === 'coder' || strippedAgent === 'coder';
+	const pathIsInDeclaredScope =
+		isCoderAgent &&
+		options?.declaredScope != null &&
+		options.declaredScope.length > 0 &&
+		isInDeclaredScope(normalizedPath, options.declaredScope, dir);
+	if (!pathIsInDeclaredScope) {
+		if (rules.allowedPrefix != null && rules.allowedPrefix.length > 0) {
+			const isAllowed = rules.allowedPrefix.some((prefix) =>
+				normalizedPath.startsWith(prefix),
+			);
+			if (!isAllowed) {
+				return {
+					allowed: false,
+					reason: `Path ${normalizedPath} not in allowed list for ${normalizedAgent}`,
+				};
+			}
+		} else if (
+			rules.allowedPrefix != null &&
+			rules.allowedPrefix.length === 0
+		) {
+			// Empty allowedPrefix means nothing is allowed by prefix
 			return {
 				allowed: false,
 				reason: `Path ${normalizedPath} not in allowed list for ${normalizedAgent}`,
 			};
 		}
-	} else if (rules.allowedPrefix != null && rules.allowedPrefix.length === 0) {
-		// Empty allowedPrefix means nothing is allowed by prefix
-		return {
-			allowed: false,
-			reason: `Path ${normalizedPath} not in allowed list for ${normalizedAgent}`,
-		};
 	}
 
 	// Step 8: blockedZones - zone-based blocking
@@ -2443,11 +3608,13 @@ export function checkFileAuthority(
 	filePath: string,
 	cwd: string,
 	authorityConfig?: AuthorityConfig,
+	options?: { declaredScope?: string[] | null },
 ): { allowed: true } | { allowed: false; reason: string; zone?: FileZone } {
 	return checkFileAuthorityWithRules(
 		agentName,
 		filePath,
 		cwd,
 		buildEffectiveRules(authorityConfig),
+		options,
 	);
 }

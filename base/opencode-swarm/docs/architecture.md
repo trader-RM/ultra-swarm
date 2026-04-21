@@ -17,26 +17,43 @@ Swarm enforces discipline:
 ## Control Model
 
 ```
-                    ┌─────────────┐
-                    │  ARCHITECT  │
-                    │  (control)  │
-                    └──────┬──────┘
-                           │
-        ┌──────────────────┼──────────────────┐
-        │                  │                  │
-        ▼                  ▼                  ▼
+                     ┌─────────────┐
+                     │  ARCHITECT  │
+                     │  (control)  │
+                     └──────┬──────┘
+                            │
+         ┌──────────────────┼──────────────────┐
+         │                  │                  │
+         ▼                  ▼                  ▼
 ┌───────────────┐  ┌───────────────┐  ┌───────────────┐
 │   EXPLORER    │  │     SMEs      │  │   PIPELINE    │
 │  (discovery)  │  │  (advisory)   │  │ (execution)   │
-└───────────────┘  └───────────────┘  └───────────────┘
-                                              │
-                                   ┌──────────┴──────────┐
-                                   │                     │
-                                   ▼                     ▼
-                           ┌─────────────┐       ┌─────────────┐
-                           │    CODER    │       │     QA      │
-                           │ (implement) │       │  (verify)   │
-                           └─────────────┘       └─────────────┘
+└──────┬────────┘  └───────────────┘  └───────┬───────┘
+       │                                       │
+       │ curator_init ─┐              ┌────────┴────────┐
+       │ curator_phase ┘              │                 │
+       │                              ▼                 ▼
+       │                     ┌─────────────┐     ┌─────────────┐
+       │                     │    CODER    │     │     QA      │
+       │                     │ (implement) │     │  (verify)   │
+       │                     └─────────────┘     └──────┬──────┘
+       │                                                 │
+       │                              ┌─────────────────┼───────────────┐
+       │                              │                 │               │
+       │                              ▼                 ▼               ▼
+       │                     ┌──────────────┐  ┌──────────────┐ ┌─────────────────────────┐
+       │                     │   REVIEWER   │  │ TEST_ENGINEER│ │ CRITIC (4 VARIANTS)      │
+       │                     └──────────────┘  └──────────────┘ │• sounding_board          │
+       │                                                           │• drift_verifier         │
+       │                                                           │• hallucination_verifier │
+       │                                                           │• oversight              │
+       │                                                           └─────────────────────────┘
+       │
+       ▼
+┌───────────────┐
+│     DOCS      │
+│  (scribe)     │
+└───────────────┘
 ```
 
 ### Architect: The Brain
@@ -152,15 +169,24 @@ All directive language (must, should, needs, verdict, review needed, dead) was r
 - Test Engineer: Generates verification tests + adversarial tests (attack vectors, boundary violations, injection attempts)
 - Gates: Automated `diff`, `imports`, `lint`, and `secretscan` tools verify contracts, dependencies, style, and security before/during review.
 
-### Critic: The Gate
-- Reviews architect's plan BEFORE implementation begins
-- Returns APPROVED / NEEDS_REVISION / REJECTED
-- Read-only (cannot write code)
+### Critic Variants: The Gates
+- **critic** — Reviews architect's plan BEFORE implementation begins; returns APPROVED / NEEDS_REVISION / REJECTED; read-only
+- **critic_sounding_board** — Pre-escalation pushback before contacting the user; returns UNNECESSARY / REPHRASE / APPROVED / RESOLVE
+- **critic_drift_verifier** — Phase-close drift detector; verifies completed implementation matches plan spec; returns APPROVED or NEEDS_REVISION (blocks phase_complete); bypassed in turbo mode
+- **critic_hallucination_verifier** — Per-phase API/signature/claim/citation verification; opt-in via `hallucination_guard` QA gate; phase_complete blocked unless evidence written; not enabled by default
+- **critic_oversight** — Autonomous oversight variant for council and quality gate enforcement; read-only
 
 ### Docs: The Scribe
 - Documentation synthesizer
 - Automatically updates READMEs, API docs, and guides based on implementation changes
 - Runs in Phase 6 as part of project wrap-up
+- Delegates to ECC documentation specialists
+
+### Curator Agents: Knowledge Consolidation
+- **curator_init** — Consolidates prior session knowledge into architect briefing at session start; flags contradictions
+- **curator_phase** — Extends running knowledge digest at phase boundaries; observes workflow deviations and knowledge update candidates
+- Both curator agents are dispatched via `MODE: EXPLORER` with the appropriate curator mode trigger
+- Curator agents use observational language only (no directives)
 
 ---
 
@@ -250,7 +276,11 @@ For each task in current phase:
     ├── Check dependencies complete
     │   └── If blocked → Skip, mark [BLOCKED]
     │
-    ├── 5a. @coder implements (ONE task only)
+    ├── 5a. declare_scope ({ taskId, files }) — REQUIRED before coder delegation
+    │       └── Persists allowed write paths to .swarm/scopes/scope-${taskId}.json
+    │       └── Without this call, every coder Edit/Write is denied
+    │
+    ├── 5a.1. @coder implements (ONE task only)
     │       └── → REQUIRED: Print task start confirmation
     │
     ├── 5b. diff + imports tools analyze changes
@@ -351,11 +381,20 @@ All tasks in phase done
 │ - Writes drift verification evidence to .swarm/evidence/{phase}/drift-verifier.json
 │ - Verdict automatically normalized: APPROVED → approved, NEEDS_REVISION → rejected
 │ - Skip this step if spec.md does not exist
+├── 5.55. Hallucination verification gate (opt-in): Delegate to @critic_hallucination_verifier
+│ - Only when hallucination_guard QA gate is enabled
+│ - Verifies API signatures, factual claims, citations, and code references
+│ - Architect calls `write_hallucination_evidence(phase, verdict, summary)` with verdict
+│ - Writes evidence to .swarm/evidence/{phase}/hallucination-guard.json
+│ - phase_complete BLOCKED unless hallucination-guard.json exists with APPROVED verdict
+│ - Not enabled by default — recommended for claim-heavy or research-heavy work
 ├── 5.6. Verify mandatory gate evidence exists:
 │         - .swarm/evidence/{phase}/completion-verify.json (auto-written by completion-verify gate)
 │         - .swarm/evidence/{phase}/drift-verifier.json (written by @critic_drift_verifier)
-│         If either missing: run the missing gate first
-│         Note: Turbo mode automatically bypasses both gates
+│         - .swarm/evidence/{phase}/hallucination-guard.json (written by architect after @critic_hallucination_verifier, if hallucination_guard enabled)
+│         If mandatory gates missing: run the missing gate first
+│         Note: Turbo mode automatically bypasses completion-verify and drift-verifier gates
+│         Note: hallucination_guard gate is NOT bypassed by turbo mode when explicitly enabled
 ├── 6. Call phase_complete (enforces two mandatory gates automatically)
 │         - Gate 1: completion-verify — deterministic identifier check in source files
 │         - Gate 2: drift verifier evidence — reads drift-verifier.json for approved verdict
@@ -371,6 +410,7 @@ The `phase_complete` tool enforces two mandatory gates before marking a phase co
 |------|---------|-----------------|--------------|
 | `completion-verify` | Deterministic check that plan task identifiers exist in source files | `COMPLETION_INCOMPLETE` — zero identifiers found in target files | Yes |
 | `drift-verifier` | Evidence-based check that `critic_drift_verifier` approved the implementation | `DRIFT_VERIFICATION_MISSING` or `DRIFT_VERIFICATION_REJECTED` | Yes |
+| `hallucination-guard` | Evidence-based check that `critic_hallucination_verifier` approved (opt-in) | `HALLUCINATION_VERIFICATION_MISSING` or `HALLUCINATION_VERIFICATION_REJECTED` | No (when enabled) |
 
 **Gate 1: Completion Verify**
 - Parses plan task descriptions for identifiers (backtick, camelCase, PascalCase, config keys)
