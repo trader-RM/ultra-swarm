@@ -26,41 +26,10 @@ import {
 import { injectSkillsList, getSkillSummaries } from "./skills";
 import { GetAvailableSkills, ReadSkillFile, RunSkillScript, UseSkill } from "./tools";
 import { matchSkills, precomputeSkillEmbeddings } from "./embeddings";
-import fs from "node:fs";
-import path from "node:path";
+import { appendSkillSuggestion, SKILL_MATCH_THRESHOLD, isAgentInstruction, mandatorySkillInjection } from "./plugin.patch.utils";
 
 const setupCompleteSessions = new Set<string>();
 const loadedSkillsPerSession = new Map<string, Set<string>>();
-
-// Mandatory skill injection configuration - when false, matched skills are tracked but not injected
-const mandatorySkillInjection = 
-  !(process.env.SKILLS_MANDATORY_INJECTION === "false" || process.env.SKILLS_MANDATORY_INJECTION === "0");
-
-/**
- * Append a skill suggestion entry to the tracking file
- * @param baseDir The base directory where .swarm/ should be created
- * @param entry The suggestion entry to append
- */
-export function appendSkillSuggestion(
-  baseDir: string,
-  entry: {
-    timestamp: string;
-    sessionId: string;
-    matchedSkills: string[];
-    threshold: number;
-    mandatory: boolean;
-    injected: number;
-  }
-): void {
-  try {
-    const swarmDir = path.join(baseDir, ".swarm");
-    fs.mkdirSync(swarmDir, { recursive: true });
-    const filePath = path.join(swarmDir, "skill-suggestions.jsonl");
-    fs.appendFileSync(filePath, JSON.stringify(entry) + "\n");
-  } catch (error) {
-    console.warn("Failed to append skill suggestion to tracker:", error);
-  }
-}
 
 function getLoadedSkills(sessionID: string): Set<string> {
   let set = loadedSkillsPerSession.get(sessionID);
@@ -72,37 +41,8 @@ function getLoadedSkills(sessionID: string): Set<string> {
 }
 
 /**
- * Identify synthetic parts that contain agent-to-agent instruction text.
- * Uses strict prefix matching to avoid false positives from loose keyword matching.
- * Excludes the plugin's own <skill-evaluation-required> injections to prevent
- * feedback loops (re-matching our own matched skills would be circular).
+ * Format matched skills into a synthetic injection for the agent.
  */
-function isAgentInstruction(text: string): boolean {
-  if (!text || text.trim().length === 0) return false;
-  // Exclude the plugin's own skill evaluation injections
-  if (text.includes("<skill-evaluation-required>")) return false;
-  if (text.includes("<available-skills>")) return false;
-  // Require explicit delegation markers at RAW line start (no trim)
-  // This prevents matching indented code blocks, quoted examples, or prose
-  const lines = text.split('\n');
-  for (const line of lines) {
-    // Must start at column 0 - no leading whitespace
-    if (
-      line.startsWith("[agent]") ||
-      line.startsWith("TASK:") ||
-      line.startsWith("CONSTRAINT:") ||
-      line.startsWith("ACCEPTANCE:") ||
-      line.startsWith("FILE:") ||
-      line.startsWith("INPUT:") ||
-      line.startsWith("OUTPUT:") ||
-      line.startsWith("DESCRIPTION:")
-    ) {
-      return true;
-    }
-  }
-  return false;
-}
-
 function formatMatchedSkillsInjection(
   matchedSkills: Array<{ name: string; description: string }>
 ): string {
@@ -205,7 +145,7 @@ export const SkillsPlugin: Plugin = async ({ client, $, directory }) => {
         return;
       }
 
-      const matchedSkills = await matchSkills(matchText, skills, 0.70);
+      const matchedSkills = await matchSkills(matchText, skills, SKILL_MATCH_THRESHOLD);
 
       const loadedSkills = getLoadedSkills(sessionID);
       const newSkills = matchedSkills.filter(s => !loadedSkills.has(s.name));
@@ -215,7 +155,7 @@ export const SkillsPlugin: Plugin = async ({ client, $, directory }) => {
         timestamp: new Date().toISOString(),
         sessionId: sessionID,
         matchedSkills: matchedSkills.map(s => s.name),
-        threshold: 0.70,
+        threshold: SKILL_MATCH_THRESHOLD,
         mandatory: mandatorySkillInjection,
         injected: mandatorySkillInjection ? newSkills.length : 0
       };

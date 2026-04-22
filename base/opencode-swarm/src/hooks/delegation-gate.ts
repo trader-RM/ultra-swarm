@@ -7,13 +7,16 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { z } from 'zod';
 
 import type { PluginConfig } from '../config';
+import { ALL_AGENT_NAMES, APPROVED_ECC_AGENTS } from '../config/constants';
 import { stripKnownSwarmPrefix } from '../config/schema';
 import {
 	routeReviewForChanges,
 	shouldParallelizeReview,
 } from '../parallel/review-router.js';
+import { pendingCoderScopeByTaskId } from '../pending-coder-scope.js';
 import type { AgentSessionState } from '../state';
 import {
 	advanceTaskState,
@@ -34,27 +37,15 @@ import { deleteStoredInputArgs, getStoredInputArgs } from './guardrails';
 import { normalizeToolName } from './normalize-tool-name';
 import { validateSwarmPath } from './utils';
 
-/**
- * v6.33.1 CRIT-1: Fallback map for declared coder scope by taskId.
- * When messagesTransform sets declaredCoderScope on the architect session,
- * the coder session may not exist yet. This map allows scope-guard to look up
- * the scope by taskId when the session's declaredCoderScope is null.
- *
- * v6.70.0 gap-closure: this map is module-scoped (not inside `swarmState`) and
- * is cleared by `resetSwarmState` via `clearPendingCoderScope()` below. Without
- * that cleanup, a `/swarm close` followed by a new session with a colliding
- * taskId (e.g. "1.1") would inherit stale scope from the previous swarm.
- */
-export const pendingCoderScopeByTaskId = new Map<string, string[]>();
+const ConveneCouncilOutputSchema = z.object({
+	success: z.boolean().optional(),
+	overallVerdict: z.enum(['APPROVE', 'REJECT', 'CONCERNS']).optional(),
+	allCriteriaMet: z.boolean().optional(),
+	requiredFixesCount: z.number().optional(),
+	roundNumber: z.number().optional(),
+});
 
-/**
- * v6.70.0 gap-closure: clears the pending coder-scope map. Exported as a
- * helper (rather than importing the map directly from state.ts) to avoid the
- * circular import `state.ts ↔ delegation-gate.ts`. Called by `resetSwarmState`.
- */
-export function clearPendingCoderScope(): void {
-	pendingCoderScopeByTaskId.clear();
-}
+const MIN_ECC_DELEGATIONS_PER_TASK = 1;
 
 /**
  * Checks if an object has the required fields to be a DelegationEnvelope.
@@ -264,7 +255,13 @@ export function validateDelegationEnvelope(
 	const rawAgent = e.targetAgent as string;
 	const normalizedAgent = stripKnownSwarmPrefix(rawAgent);
 	if (!context.validAgents.includes(normalizedAgent)) {
-		return { valid: false, reason: 'invalid_target_agent' };
+		const isApprovedEccAgent =
+			APPROVED_ECC_AGENTS.length > 0 &&
+			(APPROVED_ECC_AGENTS as readonly string[]).includes(normalizedAgent);
+		if (!isApprovedEccAgent) {
+			return { valid: false, reason: 'invalid_target_agent' };
+		}
+		// ECC agent approved — continue to structural validation below
 	}
 
 	// files must be non-empty for implement or review actions
@@ -619,45 +616,57 @@ export function createDelegationGateHook(
 				// _output may be a string (older runtimes) or already-parsed object.
 				const parsed =
 					typeof _output === 'string' ? JSON.parse(_output) : _output;
-				const result = parsed as {
-					success?: boolean;
-					overallVerdict?: 'APPROVE' | 'REJECT' | 'CONCERNS';
-					allCriteriaMet?: boolean;
-					requiredFixesCount?: number;
-					roundNumber?: number;
-				} | null;
-				if (
-					result &&
-					typeof result === 'object' &&
-					result.success === true &&
-					typeof result.overallVerdict === 'string'
-				) {
-					const directArgs = input.args as Record<string, unknown> | undefined;
-					const storedArgs = getStoredInputArgs(input.callID) as
-						| Record<string, unknown>
-						| undefined;
-					const taskIdRaw = directArgs?.taskId ?? storedArgs?.taskId;
-					const taskId = typeof taskIdRaw === 'string' ? taskIdRaw : null;
-					if (taskId) {
-						if (!session.taskCouncilApproved)
-							session.taskCouncilApproved = new Map();
-						session.taskCouncilApproved.set(taskId, {
-							verdict: result.overallVerdict,
-							roundNumber:
-								typeof result.roundNumber === 'number' ? result.roundNumber : 1,
-						});
-						if (
-							councilActive &&
-							result.overallVerdict === 'APPROVE' &&
-							result.allCriteriaMet === true &&
-							(result.requiredFixesCount ?? 0) === 0
-						) {
-							try {
-								advanceTaskState(session, taskId, 'complete');
-							} catch (err) {
-								console.warn(
-									`[delegation-gate] toolAfter convene_council: could not advance ${taskId} → complete: ${err instanceof Error ? err.message : String(err)}`,
-								);
+				const parseResult = ConveneCouncilOutputSchema.safeParse(parsed);
+				if (!parseResult.success) {
+					console.warn(
+						`[delegation-gate] toolAfter convene_council: output schema mismatch`,
+					);
+					// skip processing this output; falls through to early return
+				} else {
+					const result = parseResult.data;
+					if (
+						result &&
+						typeof result === 'object' &&
+						result.success === true &&
+						typeof result.overallVerdict === 'string'
+					) {
+						const directArgs = input.args as
+							| Record<string, unknown>
+							| undefined;
+						const storedArgs = getStoredInputArgs(input.callID) as
+							| Record<string, unknown>
+							| undefined;
+						const taskIdRaw = directArgs?.taskId ?? storedArgs?.taskId;
+						const taskId = typeof taskIdRaw === 'string' ? taskIdRaw : null;
+						if (taskId) {
+							if (
+								councilActive &&
+								result.overallVerdict === 'APPROVE' &&
+								result.allCriteriaMet === true &&
+								(result.requiredFixesCount ?? 0) === 0
+							) {
+								session.taskCouncilApproved.set(taskId, {
+									verdict: result.overallVerdict,
+									roundNumber:
+										typeof result.roundNumber === 'number'
+											? result.roundNumber
+											: 1,
+								});
+								try {
+									advanceTaskState(session, taskId, 'complete');
+								} catch (err) {
+									console.warn(
+										`[delegation-gate] toolAfter convene_council: could not advance ${taskId} → complete: ${err instanceof Error ? err.message : String(err)}`,
+									);
+								}
+								// Soft-warn if task completed with too few ECC delegations
+								const eccCount =
+									session.eccDelegationsByTaskId.get(taskId) ?? 0;
+								if (eccCount < MIN_ECC_DELEGATIONS_PER_TASK) {
+									console.warn(
+										`[delegation-gate] Task ${taskId} completed with only ${eccCount} ECC delegation(s) (minimum: ${MIN_ECC_DELEGATIONS_PER_TASK}). Consider delegating to ECC specialists for better coverage.`,
+									);
+								}
 							}
 						}
 					}
@@ -694,6 +703,25 @@ export function createDelegationGateHook(
 				// Track which agents have been delegated to
 				if (targetAgent === 'reviewer') hasReviewer = true;
 				if (targetAgent === 'test_engineer') hasTestEngineer = true;
+
+				// Track ECC delegations per task (non-ECC agents only)
+				const taskIdForEcc =
+					(input.args as Record<string, unknown>)?.taskId ??
+					(storedArgs as Record<string, unknown>)?.taskId ??
+					session.currentTaskId;
+				if (
+					taskIdForEcc &&
+					!ALL_AGENT_NAMES.includes(
+						targetAgent as (typeof ALL_AGENT_NAMES)[number],
+					)
+				) {
+					const current =
+						session.eccDelegationsByTaskId.get(taskIdForEcc as string) ?? 0;
+					session.eccDelegationsByTaskId.set(
+						taskIdForEcc as string,
+						current + 1,
+					);
+				}
 
 				// Stage B advancement (current-session and cross-session) is the
 				// non-council path. When council is authoritative for this plan

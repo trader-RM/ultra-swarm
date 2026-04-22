@@ -20,11 +20,11 @@ import {
 	type GuardrailsConfig,
 	GuardrailsConfigSchema,
 } from '../../../src/config/schema';
-import { pendingCoderScopeByTaskId } from '../../../src/hooks/delegation-gate';
 import {
 	checkWriteTargetForSymlink,
 	createGuardrailsHooks,
 } from '../../../src/hooks/guardrails';
+import { pendingCoderScopeByTaskId } from '../../../src/pending-coder-scope';
 import {
 	beginInvocation,
 	ensureAgentSession,

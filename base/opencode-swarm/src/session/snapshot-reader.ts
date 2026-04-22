@@ -131,6 +131,9 @@ export function deserializeAgentSession(
 		qaSkipCount: s.qaSkipCount ?? 0,
 		qaSkipTaskIds: s.qaSkipTaskIds ?? [],
 		taskWorkflowStates: deserializeTaskWorkflowStates(s.taskWorkflowStates),
+		stageBCompletion: new Map(),
+		taskCouncilApproved: new Map(),
+		qaGateSessionOverrides: {},
 		lastGateOutcome: null,
 		declaredCoderScope: null,
 		lastScopeViolation: null,
@@ -147,6 +150,7 @@ export function deserializeAgentSession(
 		fullAutoDeadlockCount: s.fullAutoDeadlockCount ?? 0,
 		fullAutoLastQuestionHash: s.fullAutoLastQuestionHash ?? null,
 		sessionRehydratedAt: s.sessionRehydratedAt ?? 0,
+		eccDelegationsByTaskId: new Map(),
 	};
 }
 

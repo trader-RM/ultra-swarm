@@ -53,6 +53,9 @@ describe('Task 4: Turbo Mode Regression Tests', () => {
 			qaSkipCount: 0,
 			qaSkipTaskIds: [],
 			taskWorkflowStates: new Map(),
+			stageBCompletion: new Map(),
+			taskCouncilApproved: new Map(),
+			qaGateSessionOverrides: {},
 			lastGateOutcome: null,
 			declaredCoderScope: null,
 			lastScopeViolation: null,
@@ -71,6 +74,7 @@ describe('Task 4: Turbo Mode Regression Tests', () => {
 			model_fallback_index: 0,
 			modelFallbackExhausted: false,
 			sessionRehydratedAt: 0,
+			eccDelegationsByTaskId: new Map(),
 		});
 
 		// Create temp directory for plan.json
@@ -342,6 +346,9 @@ describe('Task 4: Turbo Mode Regression Tests', () => {
 				qaSkipCount: 0,
 				qaSkipTaskIds: [],
 				taskWorkflowStates: new Map(),
+				stageBCompletion: new Map(),
+				taskCouncilApproved: new Map(),
+				qaGateSessionOverrides: {},
 				lastGateOutcome: null,
 				declaredCoderScope: null,
 				lastScopeViolation: null,
@@ -360,6 +367,7 @@ describe('Task 4: Turbo Mode Regression Tests', () => {
 				model_fallback_index: 0,
 				modelFallbackExhausted: false,
 				sessionRehydratedAt: 0,
+				eccDelegationsByTaskId: new Map(),
 			});
 
 			// First session has turboMode: false
@@ -416,6 +424,9 @@ describe('Task 4: Turbo Mode Regression Tests', () => {
 				qaSkipCount: 0,
 				qaSkipTaskIds: [],
 				taskWorkflowStates: new Map(),
+				stageBCompletion: new Map(),
+				taskCouncilApproved: new Map(),
+				qaGateSessionOverrides: {},
 				lastGateOutcome: null,
 				declaredCoderScope: null,
 				lastScopeViolation: null,
@@ -434,6 +445,7 @@ describe('Task 4: Turbo Mode Regression Tests', () => {
 				model_fallback_index: 0,
 				modelFallbackExhausted: false,
 				sessionRehydratedAt: 0,
+				eccDelegationsByTaskId: new Map(),
 			});
 		});
 

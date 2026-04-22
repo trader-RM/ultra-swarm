@@ -24,6 +24,12 @@ export const ALL_AGENT_NAMES = [
 	...ALL_SUBAGENT_NAMES,
 ] as const;
 
+/**
+ * Approved ECC specialist agents that may be delegated to.
+ * Any agent name not in ALL_AGENT_NAMES or this list is blocked.
+ */
+export const APPROVED_ECC_AGENTS = [] as const;
+
 // Type definitions
 export type QAAgentName = (typeof QA_AGENTS)[number];
 export type PipelineAgentName = (typeof PIPELINE_AGENTS)[number];

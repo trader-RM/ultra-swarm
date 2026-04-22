@@ -12,9 +12,9 @@
 import * as path from 'node:path';
 import { ORCHESTRATOR_NAME, WRITE_TOOL_NAMES } from '../config/constants';
 import { stripKnownSwarmPrefix } from '../config/schema';
+import { pendingCoderScopeByTaskId } from '../pending-coder-scope.js';
 import { resolveScopeWithFallbacks } from '../scope/scope-persistence';
 import { swarmState } from '../state';
-import { pendingCoderScopeByTaskId } from './delegation-gate.js';
 import { normalizeToolName } from './normalize-tool-name';
 
 // NOTE: bash/shell tools are intentionally excluded from WRITE_TOOLS.

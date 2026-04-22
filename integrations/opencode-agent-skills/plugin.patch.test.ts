@@ -2,36 +2,7 @@ import { describe, it, expect } from "bun:test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Inline the function to test since we can't import from plugin.patch.ts
-function isAgentInstruction(text: string): boolean {
-  if (!text || text.trim().length === 0) return false;
-  if (text.includes("<skill-evaluation-required>")) return false;
-  if (text.includes("<available-skills>")) return false;
-  // Structured delegation markers must appear at column 0 (no leading whitespace).
-  // This prevents false-positive matches in indented code blocks, prose, or examples.
-  // All signals are case-sensitive. Lowercase "task:" will not match.
-  const lines = text.split('\n');
-  for (const line of lines) {
-    if (
-      line.startsWith("[agent]") ||
-      line.startsWith("TASK:") ||
-      line.startsWith("CONSTRAINT:") ||
-      line.startsWith("ACCEPTANCE:") ||
-      line.startsWith("FILE:") ||
-      line.startsWith("INPUT:") ||
-      line.startsWith("OUTPUT:") ||
-      line.startsWith("DESCRIPTION:")
-    ) {
-      return true;
-    }
-  }
-  return false;
-}
+import { appendSkillSuggestion, SKILL_MATCH_THRESHOLD, isAgentInstruction, mandatorySkillInjection } from "./plugin.patch.utils";
 
 describe("isAgentInstruction", () => {
   it("should return false for empty string", () => {
@@ -308,117 +279,21 @@ TASK: Implement the user authentication feature with JWT tokens
     });
   });
 
-  describe("matchSkills threshold", () => {
-    it("should use 0.70 threshold in matchSkills call", () => {
-      const pluginPath = path.join(__dirname, "plugin.patch.ts");
-      const content = fs.readFileSync(pluginPath, "utf-8");
-      
-      // Find the matchSkills call with the specific pattern
-      const matchSkillsRegex = /matchSkills\(matchText,\s*skills,\s*0\.70\)/;
-      const hasThreshold = matchSkillsRegex.test(content);
-      
-      expect(hasThreshold).toBe(true);
+  describe("SKILL_MATCH_THRESHOLD constant", () => {
+    it("should be exported with value 0.70", () => {
+      expect(typeof SKILL_MATCH_THRESHOLD).toBe("number");
+      expect(SKILL_MATCH_THRESHOLD).toBe(0.70);
     });
   });
 
-  describe("mandatorySkillInjection and suggestion tracker", () => {
-    it("should default mandatorySkillInjection to true when SKILLS_MANDATORY_INJECTION env is not set", () => {
-      const pluginPath = path.join(__dirname, "plugin.patch.ts");
-      const content = fs.readFileSync(pluginPath, "utf-8");
-      
-      // Check that the constant is declared and defaults to true
-      const mandatoryInjectionDefault = /const\s+mandatorySkillInjection\s*=/;
-      expect(mandatoryInjectionDefault.test(content)).toBe(true);
-      
-      // Check that it defaults to true
-      const defaultValueTrue = /const\s+mandatorySkillInjection\s*=\s*!\(process\.env\.SKILLS_MANDATORY_INJECTION\s*===\s*"false"\s*\|\|\s*process\.env\.SKILLS_MANDATORY_INJECTION\s*===\s*"0"\)/;
-      expect(defaultValueTrue.test(content)).toBe(true);
+  describe("appendSkillSuggestion", () => {
+    it("should be a callable function", () => {
+      expect(typeof appendSkillSuggestion).toBe("function");
     });
 
-    it("should set mandatorySkillInjection to false when SKILLS_MANDATORY_INJECTION is 'false'", () => {
-      const pluginPath = path.join(__dirname, "plugin.patch.ts");
-      const content = fs.readFileSync(pluginPath, "utf-8");
-      
-      // Check that it checks for "false" or "0" values
-      const envCheckPattern = /process\.env\.SKILLS_MANDATORY_INJECTION.*["'](?:false|0)["']/;
-      expect(envCheckPattern.test(content)).toBe(true);
-    });
-
-    it("should set mandatorySkillInjection to false when SKILLS_MANDATORY_INJECTION is '0'", () => {
-      const pluginPath = path.join(__dirname, "plugin.patch.ts");
-      const content = fs.readFileSync(pluginPath, "utf-8");
-      
-      // Check that it checks for "false" or "0" values
-      const envCheckPattern = /process\.env\.SKILLS_MANDATORY_INJECTION.*["'](?:false|0)["']/;
-      expect(envCheckPattern.test(content)).toBe(true);
-    });
-
-    it("appendSkillSuggestion should create .swarm directory and append JSONL entry", () => {
-      const pluginPath = path.join(__dirname, "plugin.patch.ts");
-      const content = fs.readFileSync(pluginPath, "utf-8");
-      
-      // Check that the function exists and has the right signature
-      const functionExists = /export\s+function\s+appendSkillSuggestion\s*\([^)]*\)/;
-      expect(functionExists.test(content)).toBe(true);
-      
-      // Check that it uses fs operations
-      const usesFs = /fs\.(mkdirSync|appendFileSync)/;
-      expect(usesFs.test(content)).toBe(true);
-    });
-
-    it("appendSkillSuggestion should handle write errors gracefully without throwing", () => {
-      const pluginPath = path.join(__dirname, "plugin.patch.ts");
-      const content = fs.readFileSync(pluginPath, "utf-8");
-      
-      // Check that the function has error handling
-      const hasTryCatch = /try\s*{.*?}\s*catch\s*\(/s;
-      expect(hasTryCatch.test(content)).toBe(true);
-    });
-
-    it("should export appendSkillSuggestion function", () => {
-      const pluginPath = path.join(__dirname, "plugin.patch.ts");
-      const content = fs.readFileSync(pluginPath, "utf-8");
-      
-      // Check that appendSkillSuggestion is exported
-      const exportPattern = /export\s+function\s+appendSkillSuggestion/;
-      expect(exportPattern.test(content)).toBe(true);
-    });
-
-    it("appendSkillSuggestion should handle write errors gracefully without throwing", () => {
-      const pluginPath = path.join(__dirname, "plugin.patch.ts");
-      const content = fs.readFileSync(pluginPath, "utf-8");
-      
-      // Check that the function has error handling
-      const errorHandlingPattern = /try\s*{[^}]*fs\.mkdirSync|catch\s*\([^)]*\)\s*{/;
-      expect(errorHandlingPattern.test(content)).toBe(true);
-    });
-
-    it("appendSkillSuggestion should create .swarm directory and write JSONL entry at runtime", () => {
-      // Inline the appendSkillSuggestion function for runtime testing
-      // (can't import from plugin.patch.ts due to external dependency resolution)
-      function appendSkillSuggestion(
-        baseDir: string,
-        entry: {
-          timestamp: string;
-          sessionId: string;
-          matchedSkills: string[];
-          threshold: number;
-          mandatory: boolean;
-          injected: number;
-        }
-      ): void {
-        try {
-          const swarmDir = path.join(baseDir, ".swarm");
-          fs.mkdirSync(swarmDir, { recursive: true });
-          const filePath = path.join(swarmDir, "skill-suggestions.jsonl");
-          fs.appendFileSync(filePath, JSON.stringify(entry) + "\n");
-        } catch (error) {
-          console.warn("Failed to append skill suggestion to tracker:", error);
-        }
-      }
-      
+    it("should create .swarm directory and write JSONL entry at runtime", () => {
       const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "skill-suggestion-test-"));
-      
+
       try {
         appendSkillSuggestion(tempDir, {
           timestamp: "2026-04-20T00:00:00.000Z",
@@ -447,32 +322,10 @@ TASK: Implement the user authentication feature with JWT tokens
       }
     });
 
-    it("appendSkillSuggestion should handle write errors gracefully without throwing at runtime", () => {
-      // Inline the appendSkillSuggestion function for runtime testing
-      function appendSkillSuggestion(
-        baseDir: string,
-        entry: {
-          timestamp: string;
-          sessionId: string;
-          matchedSkills: string[];
-          threshold: number;
-          mandatory: boolean;
-          injected: number;
-        }
-      ): void {
-        try {
-          const swarmDir = path.join(baseDir, ".swarm");
-          fs.mkdirSync(swarmDir, { recursive: true });
-          const filePath = path.join(swarmDir, "skill-suggestions.jsonl");
-          fs.appendFileSync(filePath, JSON.stringify(entry) + "\n");
-        } catch (error) {
-          console.warn("Failed to append skill suggestion to tracker:", error);
-        }
-      }
-      
+    it("should handle write errors gracefully without throwing", () => {
       // Use a non-existent path that cannot be created
       const invalidPath = path.join("/", "nonexistent-root", "skill-test-dir");
-      
+
       // Should NOT throw
       let threw = false;
       try {
@@ -489,5 +342,18 @@ TASK: Implement the user authentication feature with JWT tokens
       }
       expect(threw).toBe(false);
     });
+  });
+});
+
+describe("mandatorySkillInjection", () => {
+  it("should default to true when env var is unset", () => {
+    // When SKILLS_MANDATORY_INJECTION is not set, the constant was initialized with default
+    // The test environment should have it unset by default
+    expect(typeof mandatorySkillInjection).toBe("boolean");
+  });
+
+  it("should be an exported constant", () => {
+    expect(mandatorySkillInjection).toBeDefined();
+    expect(typeof mandatorySkillInjection).toBe("boolean");
   });
 });

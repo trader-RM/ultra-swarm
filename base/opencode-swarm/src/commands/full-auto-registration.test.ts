@@ -95,6 +95,9 @@ describe('Full-Auto Command Registration', () => {
 				qaSkipCount: 0,
 				qaSkipTaskIds: [],
 				taskWorkflowStates: new Map(),
+				stageBCompletion: new Map(),
+				taskCouncilApproved: new Map(),
+				qaGateSessionOverrides: {},
 				lastGateOutcome: null,
 				declaredCoderScope: null,
 				lastScopeViolation: null,
@@ -113,6 +116,7 @@ describe('Full-Auto Command Registration', () => {
 				model_fallback_index: 0,
 				modelFallbackExhausted: false,
 				sessionRehydratedAt: 0,
+				eccDelegationsByTaskId: new Map(),
 			});
 		});
 

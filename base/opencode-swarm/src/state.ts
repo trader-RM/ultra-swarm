@@ -19,7 +19,7 @@ import {
 	type EnvironmentProfile,
 } from './environment/profile.js';
 import type { TaskEvidence } from './gate-evidence';
-import { clearPendingCoderScope } from './hooks/delegation-gate.js';
+import { clearPendingCoderScope } from './pending-coder-scope.js';
 import { loadPlanJsonOnly } from './plan/manager.js';
 import { AgentRunContext } from './state/agent-run-context.js';
 import { telemetry } from './telemetry.js';
@@ -163,9 +163,9 @@ export interface AgentSessionState {
 	 * When both are present, the task may advance to tests_run regardless of order.
 	 * Only populated when parallelization.stageB.parallel.enabled = true.
 	 */
-	stageBCompletion?: Map<string, Set<'reviewer' | 'test_engineer'>>;
+	stageBCompletion: Map<string, Set<'reviewer' | 'test_engineer'>>;
 	/** v6.71+ Council mode: per-task council verdict, recorded by delegation-gate when convene_council resolves. */
-	taskCouncilApproved?: Map<
+	taskCouncilApproved: Map<
 		string,
 		{ verdict: 'APPROVE' | 'REJECT' | 'CONCERNS'; roundNumber: number }
 	>;
@@ -214,10 +214,8 @@ export interface AgentSessionState {
 	// QA Gate Profile session overrides (ratchet-tighter only)
 	/** Session-level QA gate overrides layered on top of the spec-level profile.
 	 *  Overrides can only enable gates (true); false values are ignored by
-	 *  getEffectiveGates. Cleared on session reset. Optional for backwards
-	 *  compatibility with pre-existing session state fixtures; consumers
-	 *  should read via `session.qaGateSessionOverrides ?? {}`. */
-	qaGateSessionOverrides?: Partial<QaGates>;
+	 *  getEffectiveGates. Cleared on session reset. */
+	qaGateSessionOverrides: Partial<QaGates>;
 
 	// Full Auto Mode (Phase 2)
 	/** Session-scoped Full Auto flag for autonomous multi-agent oversight */
@@ -242,6 +240,8 @@ export interface AgentSessionState {
 	// Stale state detection (Bug B)
 	/** Timestamp when session was rehydrated from snapshot (0 if never rehydrated) */
 	sessionRehydratedAt: number;
+	/** ECC agent delegations per task (taskId → count) */
+	eccDelegationsByTaskId: Map<string, number>;
 }
 
 /**
@@ -288,16 +288,12 @@ export const defaultRunContext = new AgentRunContext<
 	EnvironmentProfile
 >('default', _toolAggregates);
 
-// Registry for future multi-run dispatch (dark, not yet populated by production code).
-const _runContexts = new Map<string, typeof defaultRunContext>();
-
 /**
  * Return the AgentRunContext for the given runId.
- * No argument or unknown runId returns defaultRunContext (single-run semantics preserved).
+ * Always returns defaultRunContext (single-run semantics preserved).
  */
-export function getRunContext(runId?: string): typeof defaultRunContext {
-	if (!runId) return defaultRunContext;
-	return _runContexts.get(runId) ?? defaultRunContext;
+export function getRunContext(_runId?: string): typeof defaultRunContext {
+	return defaultRunContext;
 }
 
 /**
@@ -407,6 +403,11 @@ export function startAgentSession(
 		swarmState.agentSessions.delete(id);
 	}
 
+	// Clear per-session eccDelegationsByTaskId maps
+	for (const session of swarmState.agentSessions.values()) {
+		session.eccDelegationsByTaskId.clear();
+	}
+
 	// Create new session state
 	const sessionState: AgentSessionState = {
 		agentName,
@@ -463,6 +464,8 @@ export function startAgentSession(
 		loopDetectionWindow: [],
 		pendingAdvisoryMessages: [],
 		sessionRehydratedAt: 0,
+		// ECC delegation tracking
+		eccDelegationsByTaskId: new Map(),
 	};
 
 	swarmState.agentSessions.set(sessionId, sessionState);
@@ -618,14 +621,6 @@ export function ensureAgentSession(
 		if (!session.taskWorkflowStates) {
 			session.taskWorkflowStates = new Map();
 		}
-		// PR 2 Stage B barrier migration safety
-		if (!session.stageBCompletion) {
-			session.stageBCompletion = new Map();
-		}
-		// v6.71+ Council mode migration safety
-		if (!session.taskCouncilApproved) {
-			session.taskCouncilApproved = new Map();
-		}
 		if (session.lastGateOutcome === undefined) {
 			session.lastGateOutcome = null;
 		}
@@ -644,10 +639,6 @@ export function ensureAgentSession(
 		// Turbo Mode migration safety (v6.26)
 		if (session.turboMode === undefined) {
 			session.turboMode = false;
-		}
-		// QA Gate Profile session overrides migration safety
-		if (session.qaGateSessionOverrides === undefined) {
-			session.qaGateSessionOverrides = {};
 		}
 		// Model Fallback migration safety (v6.33)
 		if (session.model_fallback_index === undefined) {
@@ -672,6 +663,10 @@ export function ensureAgentSession(
 		// Stale state detection migration safety (Bug B)
 		if (session.sessionRehydratedAt === undefined) {
 			session.sessionRehydratedAt = 0;
+		}
+		// ECC delegation tracking migration safety
+		if (!session.eccDelegationsByTaskId) {
+			session.eccDelegationsByTaskId = new Map();
 		}
 
 		session.lastToolCallTime = now;
@@ -906,7 +901,7 @@ export function advanceTaskState(
 		// Council fast-path: if convene_council recorded an APPROVE verdict for this task,
 		// allow advancement from any non-idle prior state. Pre-check (pre_check_passed) is
 		// still required to avoid skipping Stage A.
-		const councilEntry = session.taskCouncilApproved?.get(taskId);
+		const councilEntry = session.taskCouncilApproved.get(taskId);
 		const councilApproved = councilEntry?.verdict === 'APPROVE';
 		const pastPreCheck =
 			currentIndex >= STATE_ORDER.indexOf('pre_check_passed');
@@ -962,9 +957,6 @@ export function recordStageBCompletion(
 	agent: 'reviewer' | 'test_engineer',
 ): void {
 	if (!isValidTaskId(taskId)) return;
-	if (!session.stageBCompletion) {
-		session.stageBCompletion = new Map();
-	}
 	const existing = session.stageBCompletion.get(taskId);
 	if (existing) {
 		existing.add(agent);
@@ -986,7 +978,7 @@ export function hasBothStageBCompletions(
 	taskId: string,
 ): boolean {
 	if (!isValidTaskId(taskId)) return false;
-	const completions = session.stageBCompletion?.get(taskId);
+	const completions = session.stageBCompletion.get(taskId);
 	if (!completions) return false;
 	return completions.has('reviewer') && completions.has('test_engineer');
 }
@@ -1247,9 +1239,6 @@ export function applyRehydrationCache(session: AgentSessionState): void {
 
 	if (!session.taskWorkflowStates) {
 		session.taskWorkflowStates = new Map();
-	}
-	if (!session.taskCouncilApproved) {
-		session.taskCouncilApproved = new Map();
 	}
 
 	const { planTaskStates, evidenceMap } = _rehydrationCache;

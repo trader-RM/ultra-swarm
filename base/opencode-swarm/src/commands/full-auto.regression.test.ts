@@ -46,6 +46,9 @@ describe('Full-Auto Mode Regression Tests', () => {
 			qaSkipCount: 0,
 			qaSkipTaskIds: [],
 			taskWorkflowStates: new Map(),
+			stageBCompletion: new Map(),
+			taskCouncilApproved: new Map(),
+			qaGateSessionOverrides: {},
 			lastGateOutcome: null,
 			declaredCoderScope: null,
 			lastScopeViolation: null,
@@ -64,6 +67,7 @@ describe('Full-Auto Mode Regression Tests', () => {
 			model_fallback_index: 0,
 			modelFallbackExhausted: false,
 			sessionRehydratedAt: 0,
+			eccDelegationsByTaskId: new Map(),
 		});
 
 		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'full-auto-regression-'));
@@ -176,6 +180,9 @@ describe('Full-Auto Mode Regression Tests', () => {
 				qaSkipCount: 0,
 				qaSkipTaskIds: [],
 				taskWorkflowStates: new Map(),
+				stageBCompletion: new Map(),
+				taskCouncilApproved: new Map(),
+				qaGateSessionOverrides: {},
 				lastGateOutcome: null,
 				declaredCoderScope: null,
 				lastScopeViolation: null,
@@ -194,6 +201,7 @@ describe('Full-Auto Mode Regression Tests', () => {
 				model_fallback_index: 0,
 				modelFallbackExhausted: false,
 				sessionRehydratedAt: 0,
+				eccDelegationsByTaskId: new Map(),
 			});
 
 			// Global fallback (no sessionID)
@@ -301,6 +309,9 @@ describe('Full-Auto Mode Regression Tests', () => {
 				qaSkipCount: 0,
 				qaSkipTaskIds: [],
 				taskWorkflowStates: new Map(),
+				stageBCompletion: new Map(),
+				taskCouncilApproved: new Map(),
+				qaGateSessionOverrides: {},
 				lastGateOutcome: null,
 				declaredCoderScope: null,
 				lastScopeViolation: null,
@@ -319,6 +330,7 @@ describe('Full-Auto Mode Regression Tests', () => {
 				model_fallback_index: 0,
 				modelFallbackExhausted: false,
 				sessionRehydratedAt: 0,
+				eccDelegationsByTaskId: new Map(),
 			});
 
 			// First session has fullAutoMode: false; call hook without sessionID
@@ -369,6 +381,9 @@ describe('Full-Auto Mode Regression Tests', () => {
 				qaSkipCount: 0,
 				qaSkipTaskIds: [],
 				taskWorkflowStates: new Map(),
+				stageBCompletion: new Map(),
+				taskCouncilApproved: new Map(),
+				qaGateSessionOverrides: {},
 				lastGateOutcome: null,
 				declaredCoderScope: null,
 				lastScopeViolation: null,
@@ -387,6 +402,7 @@ describe('Full-Auto Mode Regression Tests', () => {
 				model_fallback_index: 0,
 				modelFallbackExhausted: false,
 				sessionRehydratedAt: 0,
+				eccDelegationsByTaskId: new Map(),
 			});
 		});
 

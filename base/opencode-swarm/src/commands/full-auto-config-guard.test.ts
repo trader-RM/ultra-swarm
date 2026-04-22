@@ -36,6 +36,9 @@ describe('handleFullAutoCommand — config guard', () => {
 			qaSkipCount: 0,
 			qaSkipTaskIds: [],
 			taskWorkflowStates: new Map(),
+			stageBCompletion: new Map(),
+			taskCouncilApproved: new Map(),
+			qaGateSessionOverrides: {},
 			lastGateOutcome: null,
 			declaredCoderScope: null,
 			lastScopeViolation: null,
@@ -54,6 +57,7 @@ describe('handleFullAutoCommand — config guard', () => {
 			model_fallback_index: 0,
 			modelFallbackExhausted: false,
 			sessionRehydratedAt: 0,
+			eccDelegationsByTaskId: new Map(),
 		});
 		// Default: config-level full-auto is OFF
 		swarmState.fullAutoEnabledInConfig = false;

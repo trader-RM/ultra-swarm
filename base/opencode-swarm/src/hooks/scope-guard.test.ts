@@ -13,8 +13,8 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { pendingCoderScopeByTaskId } from '../pending-coder-scope';
 import { ensureAgentSession, resetSwarmState, swarmState } from '../state';
-import { pendingCoderScopeByTaskId } from './delegation-gate';
 import { createScopeGuardHook, isFileInScope } from './scope-guard';
 
 const SESSION_ID = 'test-session-scope-guard';

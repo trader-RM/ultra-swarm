@@ -399,7 +399,7 @@ export async function detectTestFramework(cwd: string): Promise<TestFramework> {
 }
 
 // ============ Test File Mapping (Convention Scope) ============
-const TEST_PATTERNS = [
+const _TEST_PATTERNS = [
 	// Common test file patterns
 	{ test: '.spec.', source: '.' },
 	{ test: '.test.', source: '.' },
@@ -1349,14 +1349,10 @@ export async function runTests(
 	if (scope !== 'all' && files.length > 0) {
 		const unsupportedReason = getTargetedExecutionUnsupportedReason(framework);
 		if (unsupportedReason) {
-			return {
-				success: false,
-				framework,
-				scope,
-				error: `Framework "${framework}" does not support targeted test-file execution`,
-				message: `The resolved test selection cannot be run safely because ${unsupportedReason}. Use a framework-native selector manually or let the architect handle the broader sweep.`,
-				outcome: 'error',
-			};
+			// Fall back to full-suite execution for frameworks that don't support
+			// targeted test-file execution
+			scope = 'all';
+			files = [];
 		}
 	}
 
@@ -1629,24 +1625,22 @@ function recordAndAnalyzeResults(
 		sourceFiles && sourceFiles.length > 0 ? sourceFiles : testFiles
 	).map((f) => f.replace(/\\/g, '/'));
 
-	// Record aggregate result for each test file
-	for (const testFile of testFiles) {
-		try {
-			appendTestRun(
-				{
-					timestamp: now,
-					taskId: 'auto',
-					testFile: testFile.replace(/\\/g, '/'),
-					testName: '(aggregate)',
-					result: result.success ? 'pass' : 'fail',
-					durationMs: result.duration_ms || 0,
-					changedFiles,
-				},
-				workingDir,
-			);
-		} catch {
-			// History recording failure should not block test results
-		}
+	// Record a single aggregate result for the entire test run
+	try {
+		appendTestRun(
+			{
+				timestamp: now,
+				taskId: 'auto',
+				testFile: '(aggregate)',
+				testName: '(aggregate)',
+				result: result.success ? 'pass' : 'fail',
+				durationMs: result.duration_ms || 0,
+				changedFiles,
+			},
+			workingDir,
+		);
+	} catch {
+		// History recording failure should not block test results
 	}
 }
 

@@ -105,10 +105,23 @@ function findTestFilesSync(cwd: string): string[] {
 				}
 			} else if (entry.isFile()) {
 				const name = entry.name;
-				if (
+				const isTestFile =
+					// JS/TS/JSX
 					/\.(test|spec)\.(ts|tsx|js|jsx)$/.test(name) ||
-					(dir.includes('__tests__') && /\.(ts|tsx|js|jsx)$/.test(name))
-				) {
+					(dir.includes('__tests__') && /\.(ts|tsx|js|jsx)$/.test(name)) ||
+					// Go
+					/_test\.go$/.test(name) ||
+					// Python
+					/^(test_.+|.+_test\.py)$/.test(name) ||
+					// Java
+					/^(Test.+|.+Test|.+Tests|.+IT)\.java$/.test(name) ||
+					// Kotlin
+					/^(Test.+|.+Test|.+Tests)\.kt$/.test(name) ||
+					// C#
+					/^(Test.+|.+Test|.+Tests)\.cs$/.test(name) ||
+					// PowerShell
+					/\.Tests\.ps1$/.test(name);
+				if (isTestFile) {
 					testFiles.push(normalizePath(path.join(dir, entry.name)));
 				}
 			}
@@ -262,7 +275,7 @@ export async function analyzeImpact(
 	const untestedFiles: string[] = [];
 
 	for (const changedFile of validFiles) {
-		const normalizedChanged = normalizePath(path.resolve(changedFile));
+		const normalizedChanged = normalizePath(path.resolve(cwd, changedFile));
 
 		const tests = impactMap[normalizedChanged];
 		if (tests && tests.length > 0) {
@@ -275,7 +288,7 @@ export async function analyzeImpact(
 			for (const [sourcePath, tests] of Object.entries(impactMap)) {
 				if (
 					sourcePath.endsWith(changedFile) ||
-					changedFile.endsWith(sourcePath)
+					normalizePath(path.resolve(cwd, changedFile)).endsWith(sourcePath)
 				) {
 					for (const test of tests) {
 						impactedTestsSet.add(test);

@@ -25,6 +25,7 @@ import {
 	stripKnownSwarmPrefix,
 } from '../config/schema';
 import { classifyFile, type FileZone } from '../context/zone-classifier';
+import { pendingCoderScopeByTaskId } from '../pending-coder-scope.js';
 import { loadPlan } from '../plan/manager';
 import { resolveScopeWithFallbacks } from '../scope/scope-persistence';
 import {
@@ -38,7 +39,6 @@ import {
 import { telemetry } from '../telemetry.js';
 import { log, warn } from '../utils';
 import { resolveAgentConflict } from './conflict-resolution';
-import { pendingCoderScopeByTaskId } from './delegation-gate.js';
 import { extractCurrentPhaseFromPlan } from './extractors';
 import { detectLoop } from './loop-detector';
 import { extractModelInfo } from './model-limits';
@@ -951,6 +951,15 @@ export function createGuardrailsHooks(
 	// warning documented in the schema.
 	const interpreterAllowedAgents: string[] | undefined =
 		cfg.interpreter_allowed_agents;
+
+	if (
+		Array.isArray(interpreterAllowedAgents) &&
+		interpreterAllowedAgents.length === 0
+	) {
+		console.warn(
+			`[opencode-swarm] interpreter_allowed_agents is set to an empty array. This blocks ALL agents from using bash/shell tools. Set to undefined (all agents allowed) or specify allowed agents.`,
+		);
+	}
 
 	// Shell audit: enabled by default. Always writes to <cwd>/.swarm/session/shell-audit.jsonl.
 	const shellAuditEnabled: boolean = cfg.shell_audit_log ?? true;
@@ -3448,7 +3457,7 @@ function checkFileAuthorityWithRules(
 	// below. Comparing filesystem roots catches this universally: POSIX
 	// systems only have root `/`, so roots only differ when the target is
 	// on a different Windows drive.
-	if (isOnDifferentFilesystemRoot(resolvedTarget, dir)) {
+	if (isOnDifferentFilesystemRoot(resolvedTarget, path.resolve(dir))) {
 		return {
 			allowed: false,
 			reason: `Path blocked: ${filePath} is on a different drive/root than the working directory`,
