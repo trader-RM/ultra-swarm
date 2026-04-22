@@ -79,7 +79,7 @@ describe('History integration - unit style tests', () => {
 
 			// Should fail because README.md is not a source file
 			expect(parsed.success).toBe(false);
-			expect(parsed.error).toContain('no source files');
+			expect(parsed.error).toContain('Provided files contain no recognized source files or direct test files');
 		} finally {
 			fs.rmSync(tempDir, { recursive: true, force: true });
 		}
