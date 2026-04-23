@@ -2,7 +2,7 @@ import { describe, it, expect } from "bun:test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { appendSkillSuggestion, SKILL_MATCH_THRESHOLD, isAgentInstruction, mandatorySkillInjection } from "./plugin.patch.utils";
+import { appendSkillSuggestion, SKILL_MATCH_THRESHOLD, deduplicateByName, isAgentInstruction, mandatorySkillInjection } from "./plugin.patch.utils";
 
 describe("isAgentInstruction", () => {
   it("should return false for empty string", () => {
@@ -355,5 +355,34 @@ describe("mandatorySkillInjection", () => {
   it("should be an exported constant", () => {
     expect(mandatorySkillInjection).toBeDefined();
     expect(typeof mandatorySkillInjection).toBe("boolean");
+  });
+});
+
+describe("deduplicateByName", () => {
+  it("removes duplicate skill entries by name, keeping first occurrence", () => {
+    const input = [
+      { name: "security-review", description: "Security analysis" },
+      { name: "security-review", description: "Security analysis (duplicate)" },
+      { name: "python-patterns", description: "Python best practices" },
+    ];
+    const result = deduplicateByName(input);
+    expect(result).toHaveLength(2);
+    expect(result[0].name).toBe("security-review");
+    expect(result[1].name).toBe("python-patterns");
+  });
+  it("returns an empty array unchanged", () => {
+    expect(deduplicateByName([])).toEqual([]);
+  });
+  it("returns a single-entry array unchanged", () => {
+    const input = [{ name: "tdd-workflow", description: "TDD" }];
+    expect(deduplicateByName(input)).toEqual(input);
+  });
+  it("preserves all entries when no duplicates exist", () => {
+    const input = [
+      { name: "a", description: "A" },
+      { name: "b", description: "B" },
+      { name: "c", description: "C" },
+    ];
+    expect(deduplicateByName(input)).toHaveLength(3);
   });
 });

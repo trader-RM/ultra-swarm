@@ -26,7 +26,7 @@ import {
 import { injectSkillsList, getSkillSummaries } from "./skills";
 import { GetAvailableSkills, ReadSkillFile, RunSkillScript, UseSkill } from "./tools";
 import { matchSkills, precomputeSkillEmbeddings } from "./embeddings";
-import { appendSkillSuggestion, SKILL_MATCH_THRESHOLD, isAgentInstruction, mandatorySkillInjection } from "./plugin.patch.utils";
+import { appendSkillSuggestion, SKILL_MATCH_THRESHOLD, isAgentInstruction, mandatorySkillInjection, deduplicateByName } from "./plugin.patch.utils";
 
 const setupCompleteSessions = new Set<string>();
 const loadedSkillsPerSession = new Map<string, Set<string>>();
@@ -147,8 +147,12 @@ export const SkillsPlugin: Plugin = async ({ client, $, directory }) => {
 
       const matchedSkills = await matchSkills(matchText, skills, SKILL_MATCH_THRESHOLD);
 
+      // Phase 13: Deduplicate by name — combined matchText can produce duplicate matches
+      // when userText and instructionText both signal the same skill.
+      const dedupedSkills = deduplicateByName(matchedSkills);
+
       const loadedSkills = getLoadedSkills(sessionID);
-      const newSkills = matchedSkills.filter(s => !loadedSkills.has(s.name));
+      const newSkills = dedupedSkills.filter(s => !loadedSkills.has(s.name));
 
       // Track skill suggestions regardless of mandatory injection setting
       const suggestionEntry = {

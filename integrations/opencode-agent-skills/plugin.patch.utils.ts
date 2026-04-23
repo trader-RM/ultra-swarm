@@ -67,3 +67,16 @@ export function appendSkillSuggestion(
     console.warn("Failed to append skill suggestion to tracker:", error);
   }
 }
+
+/**
+ * Deduplicate skill match results by name, keeping the first occurrence of each name.
+ * Prevents double injection when userText and instructionText both signal the same skill.
+ */
+export function deduplicateByName<T extends { name: string }>(items: T[]): T[] {
+  const seen = new Set<string>();
+  return items.filter(item => {
+    if (seen.has(item.name)) return false;
+    seen.add(item.name);
+    return true;
+  });
+}
