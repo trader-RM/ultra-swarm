@@ -1349,10 +1349,14 @@ export async function runTests(
 	if (scope !== 'all' && files.length > 0) {
 		const unsupportedReason = getTargetedExecutionUnsupportedReason(framework);
 		if (unsupportedReason) {
-			// Fall back to full-suite execution for frameworks that don't support
-			// targeted test-file execution
-			scope = 'all';
-			files = [];
+			return {
+				success: false,
+				framework,
+				scope,
+				error: `Framework '${framework}' does not support targeted test-file execution.`,
+				message: unsupportedReason,
+				outcome: 'error',
+			};
 		}
 	}
 
@@ -1611,7 +1615,7 @@ interface TestHistoryReport {
 	quarantinedFailures: string[];
 }
 
-function recordAndAnalyzeResults(
+export function recordAndAnalyzeResults(
 	result: TestResult,
 	testFiles: string[],
 	workingDir: string,
@@ -1625,13 +1629,21 @@ function recordAndAnalyzeResults(
 		sourceFiles && sourceFiles.length > 0 ? sourceFiles : testFiles
 	).map((f) => f.replace(/\\/g, '/'));
 
-	// Record a single aggregate result for the entire test run
+	// Three-way key strategy satisfying FR-009 (single aggregate entry per run):
+	// - 0 files → full-suite run, key is '(full-suite)'
+	// - 1 file  → single-targeted run, key is the actual file path
+	// - 2+ files→ multi-targeted run, key is '(aggregate)'
+	const testFileKey =
+		testFiles.length === 0 ? '(full-suite)' :
+		testFiles.length === 1 ? testFiles[0].replace(/\\/g, '/') :
+		'(aggregate)';
+
 	try {
 		appendTestRun(
 			{
 				timestamp: now,
 				taskId: 'auto',
-				testFile: '(aggregate)',
+				testFile: testFileKey,
 				testName: '(aggregate)',
 				result: result.success ? 'pass' : 'fail',
 				durationMs: result.duration_ms || 0,

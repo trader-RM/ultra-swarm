@@ -154,7 +154,47 @@ test('example', () => {});`,
 		});
 	});
 
-	describe('buildImpactMap', () => {
+		describe('buildImpactMap', () => {
+			test('detects Python test files without matching non-Python extensions', async () => {
+				const sourceDir = path.join(tempDir, 'src');
+				await fs.promises.mkdir(sourceDir, { recursive: true });
+
+				const sharedFile = path.join(sourceDir, 'shared.ts');
+				await fs.promises.writeFile(sharedFile, 'export const shared = 1;');
+
+				const tsTestFile = path.join(tempDir, 'test_utils.ts');
+				await fs.promises.writeFile(
+					tsTestFile,
+					`import { shared } from './src/shared';`,
+				);
+
+				const pythonTestFile = path.join(tempDir, 'test_utils.py');
+				await fs.promises.writeFile(
+					pythonTestFile,
+					`import { shared } from './src/shared';`,
+				);
+
+				const myTestPyFile = path.join(tempDir, 'my_test.py');
+				await fs.promises.writeFile(
+					myTestPyFile,
+					`import { shared } from './src/shared';`,
+				);
+
+				const myTestGoFile = path.join(tempDir, 'my_test.go');
+				await fs.promises.writeFile(
+					myTestGoFile,
+					`import { shared } from './src/shared';`,
+				);
+
+				const impactMap = await buildImpactMap(tempDir);
+				const detectedTests = Object.values(impactMap).flat();
+
+				expect(detectedTests).toContain(pythonTestFile.replace(/\\/g, '/'));
+				expect(detectedTests).toContain(myTestPyFile.replace(/\\/g, '/'));
+				expect(detectedTests).toContain(myTestGoFile.replace(/\\/g, '/'));
+				expect(detectedTests).toHaveLength(3);
+			});
+
 		test('creates correct source→test mapping', async () => {
 			const srcDir = path.join(tempDir, 'src');
 			const testDir = path.join(srcDir, '__tests__');

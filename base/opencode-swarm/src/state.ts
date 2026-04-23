@@ -403,11 +403,6 @@ export function startAgentSession(
 		swarmState.agentSessions.delete(id);
 	}
 
-	// Clear per-session eccDelegationsByTaskId maps
-	for (const session of swarmState.agentSessions.values()) {
-		session.eccDelegationsByTaskId.clear();
-	}
-
 	// Create new session state
 	const sessionState: AgentSessionState = {
 		agentName,

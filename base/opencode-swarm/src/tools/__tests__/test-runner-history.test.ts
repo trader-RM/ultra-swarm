@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'bun:test';
+import { beforeEach, describe, expect, test, vi } from 'bun:test';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -27,7 +27,7 @@ vi.mock('../../test-impact/failure-classifier.js', () => ({
 }));
 
 // Import after mocks are set up
-import { test_runner } from '../test-runner.js';
+import { recordAndAnalyzeResults, test_runner } from '../test-runner.js';
 
 // ============ Test Helpers ============
 
@@ -356,6 +356,79 @@ describe('History integration - unit style tests', () => {
 		} finally {
 			fs.rmSync(tempDir, { recursive: true, force: true });
 		}
+	});
+
+	test("11. writes history with key '(full-suite)' for scope='all' runs", () => {
+		recordAndAnalyzeResults(
+			{
+				success: false,
+				framework: 'none',
+				scope: 'all',
+				totals: { passed: 0, failed: 2, skipped: 0, total: 2 },
+				duration_ms: 1000,
+				error: 'Tests failed',
+			},
+			[],
+			'/tmp',
+		);
+
+		expect(mockAppendTestRun).toHaveBeenCalledTimes(1);
+		expect(mockAppendTestRun).toHaveBeenCalledWith(
+			expect.objectContaining({
+				testFile: '(full-suite)',
+				result: 'fail',
+			}),
+			'/tmp',
+		);
+	});
+
+	test('12. writes history with actual path for single test file runs', () => {
+		recordAndAnalyzeResults(
+			{
+				success: true,
+				framework: 'vitest',
+				scope: 'convention',
+				command: ['npx', 'vitest', 'run'],
+				timeout_ms: 60000,
+				totals: { passed: 3, failed: 0, skipped: 0, total: 3 },
+				duration_ms: 1000,
+			},
+			['src/a.test.ts'],
+			'/tmp',
+		);
+
+		expect(mockAppendTestRun).toHaveBeenCalledTimes(1);
+		expect(mockAppendTestRun).toHaveBeenCalledWith(
+			expect.objectContaining({
+				testFile: 'src/a.test.ts',
+				result: 'pass',
+			}),
+			'/tmp',
+		);
+	});
+
+	test("13. writes history with key '(aggregate)' for multi-file runs", () => {
+		recordAndAnalyzeResults(
+			{
+				success: false,
+				framework: 'vitest',
+				scope: 'convention',
+				totals: { passed: 1, failed: 1, skipped: 0, total: 2 },
+				duration_ms: 1000,
+				error: 'Tests failed',
+			},
+			['src/a.test.ts', 'src/b.test.ts'],
+			'/tmp',
+		);
+
+		expect(mockAppendTestRun).toHaveBeenCalledTimes(1);
+		expect(mockAppendTestRun).toHaveBeenCalledWith(
+			expect.objectContaining({
+				testFile: '(aggregate)',
+				result: 'fail',
+			}),
+			'/tmp',
+		);
 	});
 });
 

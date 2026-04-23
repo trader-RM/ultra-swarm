@@ -2,9 +2,16 @@
 # Copies the patched plugin.ts from staging to the live node_modules location
 $source = Join-Path $PSScriptRoot "plugin.patch.ts"
 $target = "C:\Users\Ryan McNish\.config\opencode\node_modules\opencode-agent-skills\src\plugin.ts"
+$sourceUtils = Join-Path $PSScriptRoot "plugin.patch.utils.ts"
+$targetUtils = Join-Path (Split-Path $target -Parent) "plugin.patch.utils.ts"
 
 if (-not (Test-Path $source)) {
     Write-Error "Staging file not found: $source"
+    exit 1
+}
+
+if (-not (Test-Path $sourceUtils)) {
+    Write-Error "Staging utils file not found: $sourceUtils"
     exit 1
 }
 
@@ -37,5 +44,7 @@ if (Test-Path $backup) {
 
 # Deploy patched version
 Copy-Item $source $target -Force
+Copy-Item $sourceUtils $targetUtils -Force
 Write-Host "Deployed patched plugin.ts to: $target"
+Write-Host "Deployed patched plugin.patch.utils.ts to: $targetUtils"
 Write-Host "Restart OpenCode for changes to take effect."

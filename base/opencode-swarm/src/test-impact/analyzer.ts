@@ -112,7 +112,7 @@ function findTestFilesSync(cwd: string): string[] {
 					// Go
 					/_test\.go$/.test(name) ||
 					// Python
-					/^(test_.+|.+_test\.py)$/.test(name) ||
+					/^(test_.+|.+_test)\.py$/.test(name) ||
 					// Java
 					/^(Test.+|.+Test|.+Tests|.+IT)\.java$/.test(name) ||
 					// Kotlin
