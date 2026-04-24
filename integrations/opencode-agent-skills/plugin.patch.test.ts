@@ -291,6 +291,7 @@ TASK: Implement the user authentication feature with JWT tokens
       expect(typeof appendSkillSuggestion).toBe("function");
     });
 
+    // matchedSkills in the tracking entry reflects the deduped candidate list, not the raw match results
     it("should create .swarm directory and write JSONL entry at runtime", () => {
       const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "skill-suggestion-test-"));
 

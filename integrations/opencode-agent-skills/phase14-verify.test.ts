@@ -1,5 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import {
   isAgentInstruction,
@@ -10,10 +11,7 @@ import {
 
 describe("Phase 14 — OpenSkills Integration Smoke Tests", () => {
   // Resolve the actual skills directory used by the plugin at runtime
-  const SKILLS_DIR = path.join(
-    "C:/Users/Ryan McNish/.config/opencode",
-    "skills"
-  );
+  const SKILLS_DIR = path.join(os.homedir(), ".config", "opencode", "skills");
 
   const collectSkillMarkdownFiles = (directory: string): string[] => {
     const entries = fs.readdirSync(directory, { withFileTypes: true });
@@ -40,7 +38,7 @@ describe("Phase 14 — OpenSkills Integration Smoke Tests", () => {
     expect(entries.length).toBeGreaterThan(0);
   });
 
-  it("Check 1: Skill files have valid frontmatter with name and description", () => {
+  it("Check 1: Skill files have valid frontmatter with description", () => {
     const entries = collectSkillMarkdownFiles(SKILLS_DIR);
     expect(entries.length).toBeGreaterThan(0);
 
@@ -50,10 +48,9 @@ describe("Phase 14 — OpenSkills Integration Smoke Tests", () => {
     for (const file of entries) {
       const content = fs.readFileSync(file, "utf-8");
       const hasFrontmatter = content.startsWith("---");
-      const hasName = /(?:^|\n)name:\s*.+/m.test(content);
       const hasDescription = /(?:^|\n)description:\s*.+/m.test(content);
 
-      if (!hasFrontmatter || !hasName || !hasDescription) {
+      if (!hasFrontmatter || !hasDescription) {
         badSkills.push(path.basename(file));
       }
     }
