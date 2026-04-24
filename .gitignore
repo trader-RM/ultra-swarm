@@ -36,3 +36,10 @@ integrations/ralphy/scripts/tmp-test-evidence/
 # Merge workspace
 _merge/
 _v6.68.0_compare/
+
+# Claude Code session artifacts
+.claude/
+
+# Tool-generated temp directories
+batch-symbols-test-*/
+adversarial-test-*/
