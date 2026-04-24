@@ -54,17 +54,19 @@ describe("critical handler", () => {
     }
   });
 
-  it("writes a critical evidence file", () => {
-    const evidenceDir = path.join(tmpDir, "evidence");
-    const writtenPath = writeCriticalEvidence(evidenceDir, 30);
+  it("writes a critical evidence file to the watchdog subdirectory", () => {
+    const swarmDir = tmpDir;
+    const writtenPath = writeCriticalEvidence(swarmDir, 30);
+    expect(writtenPath).toContain("watchdog");
+    expect(path.basename(path.dirname(writtenPath))).toBe("watchdog");
     expect(fs.existsSync(writtenPath)).toBe(true);
     const content = fs.readFileSync(writtenPath, "utf-8");
     expect(content).toContain("CRITICAL");
     expect(content).toContain("30");
   });
 
-  it("does not throw when evidence directory does not exist", () => {
-    const evidenceDir = path.join(tmpDir, "nonexistent", "evidence");
-    expect(() => writeCriticalEvidence(evidenceDir, 30)).not.toThrow();
+  it("does not throw when watchdog directory does not exist", () => {
+    const nonexistentSwarmDir = path.join(tmpDir, "nonexistent");
+    expect(() => writeCriticalEvidence(nonexistentSwarmDir, 30)).not.toThrow();
   });
 });

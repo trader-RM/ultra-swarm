@@ -64,15 +64,18 @@ export function parseStatusLine(line: string): WatchdogStatus | null {
 
 /**
  * Write a CRITICAL evidence artifact when the watchdog detects a stalled session.
- * @param evidenceDir Path to the evidence directory (e.g., .swarm/evidence)
+ * Writes to .swarm/watchdog/ — NOT .swarm/evidence/ — to avoid resetting the
+ * watchdog's staleness timer. The watchdog monitors .swarm/evidence/ only.
+ * @param swarmDir Path to the .swarm directory root (e.g., my-project/.swarm)
  * @param durationMinutes How long the session has been stalled
  * @returns Absolute path to the written file
  */
-export function writeCriticalEvidence(evidenceDir: string, durationMinutes: number): string {
-  fs.mkdirSync(evidenceDir, { recursive: true });
+export function writeCriticalEvidence(swarmDir: string, durationMinutes: number): string {
+  const watchdogDir = path.join(swarmDir, "watchdog");
+  fs.mkdirSync(watchdogDir, { recursive: true });
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const filePath = path.join(evidenceDir, `watchdog-critical-${timestamp}.md`);
+  const filePath = path.join(watchdogDir, `watchdog-critical-${timestamp}.md`);
   const createdAt = new Date().toISOString();
   const content = `# Watchdog CRITICAL Alert
 

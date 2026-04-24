@@ -36,11 +36,14 @@ export function isAgentInstruction(text: string): boolean {
 }
 
 /**
- * Mandatory skill injection configuration.
- * When false, matched skills are tracked but not injected.
+ * Evaluate the mandatory skill injection flag from a raw env string.
+ * Returns false only for explicit disable values, true otherwise.
  */
-export const mandatorySkillInjection =
-  !(process.env.SKILLS_MANDATORY_INJECTION === "false" || process.env.SKILLS_MANDATORY_INJECTION === "0");
+export function evaluateMandatoryFlag(value: string | undefined): boolean {
+  return !(value === "false" || value === "0");
+}
+
+export const mandatorySkillInjection = evaluateMandatoryFlag(process.env.SKILLS_MANDATORY_INJECTION);
 
 /**
  * Append a skill suggestion entry to the tracking file
@@ -63,8 +66,8 @@ export function appendSkillSuggestion(
     fs.mkdirSync(swarmDir, { recursive: true });
     const filePath = path.join(swarmDir, "skill-suggestions.jsonl");
     fs.appendFileSync(filePath, JSON.stringify(entry) + "\n");
-  } catch (error) {
-    console.warn("Failed to append skill suggestion to tracker:", error);
+  } catch {
+    // Suggestion tracking is non-critical — file write failures are intentionally suppressed.
   }
 }
 

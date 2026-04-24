@@ -2,7 +2,7 @@ import { describe, it, expect } from "bun:test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { appendSkillSuggestion, SKILL_MATCH_THRESHOLD, deduplicateByName, isAgentInstruction, mandatorySkillInjection } from "./plugin.patch.utils";
+import { appendSkillSuggestion, SKILL_MATCH_THRESHOLD, deduplicateByName, isAgentInstruction, mandatorySkillInjection, evaluateMandatoryFlag } from "./plugin.patch.utils";
 
 describe("isAgentInstruction", () => {
   it("should return false for empty string", () => {
@@ -355,6 +355,42 @@ describe("mandatorySkillInjection", () => {
   it("should be an exported constant", () => {
     expect(mandatorySkillInjection).toBeDefined();
     expect(typeof mandatorySkillInjection).toBe("boolean");
+    expect(mandatorySkillInjection).toBe(true);
+  });
+
+  it("evaluates to false when SKILLS_MANDATORY_INJECTION env var is 'false' or '0'", () => {
+    expect(evaluateMandatoryFlag(undefined)).toBe(true);
+    expect(evaluateMandatoryFlag("false")).toBe(false);
+    expect(evaluateMandatoryFlag("0")).toBe(false);
+    expect(evaluateMandatoryFlag("true")).toBe(true);
+    expect(evaluateMandatoryFlag("1")).toBe(true);
+    expect(evaluateMandatoryFlag("")).toBe(true);
+  });
+
+  it("writes suggestion entry with mandatory: false to the tracker file", () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "skill-injection-off-test-"));
+
+    try {
+      appendSkillSuggestion(tempDir, {
+        timestamp: "2026-04-23T00:00:00.000Z",
+        sessionId: "test-session",
+        matchedSkills: ["security-review"],
+        threshold: SKILL_MATCH_THRESHOLD,
+        mandatory: false,
+        injected: 0,
+      });
+
+      const jsonlPath = path.join(tempDir, ".swarm", "skill-suggestions.jsonl");
+      expect(fs.existsSync(jsonlPath)).toBe(true);
+
+      const lines = fs.readFileSync(jsonlPath, "utf-8").trim().split("\n");
+      const lastEntry = JSON.parse(lines[lines.length - 1]);
+      expect(lastEntry.mandatory).toBe(false);
+      expect(lastEntry.injected).toBe(0);
+      expect(lastEntry.matchedSkills).toEqual(["security-review"]);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 });
 

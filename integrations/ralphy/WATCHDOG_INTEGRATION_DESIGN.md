@@ -5,7 +5,7 @@
 1. **Trigger mechanism:** Spawn as a child process from a Bun/Node script using `Bun.spawn` or `child_process.spawn`. Rationale: keeps the watchdog lifecycle tied to the outer loop, avoids orphaned jobs, and gives direct start/stop control.
 2. **Signal channel:** Use the spawned child process stdout pipe. Rationale: the watchdog already emits status lines to stdout, so the outer loop can parse them without extra files or polling.
 3. **Swarm state consumed:** Monitor `.swarm/evidence/` timestamps only; do not use `.swarm/plan.json` progress or `.swarm/context.md` mod time in MVP. Rationale: evidence files are the canonical signal of active work, while plan/context updates create false positives.
-4. **Intervention on CRITICAL:** Write a `.swarm/evidence/watchdog-critical-{ts}.md` artifact and log to stderr. Rationale: creates an observable downstream artifact without modifying swarm session state.
+4. **Intervention on CRITICAL:** Write a `.swarm/watchdog/watchdog-critical-{ts}.md` artifact and log to stderr. Rationale: creates an observable downstream artifact without modifying swarm session state. The artifact must NOT go into `.swarm/evidence/` because the watchdog monitors that directory for staleness — writing there would reset the staleness timer and mask the very condition being reported. The `.swarm/watchdog/` subdirectory is outside the monitored scope.
 5. **Loop boundary:** Use a standalone Bun process in `integrations/ralphy/scripts/watchdog-launcher.ts`. Rationale: keeps watchdog logic out of plugin core and inner repo code, while remaining independently launchable.
 
 ## Introduction
@@ -32,10 +32,10 @@ The outer watchdog is responsible for observing Ralphy session health from outsi
 
 ### CRITICAL Handler
 
-- Write `.swarm/evidence/watchdog-critical-{ISO8601}.md`.
+- Write `.swarm/watchdog/watchdog-critical-{ISO8601}.md`.
 - Include timestamp, staleness duration, and a suggested user action.
 - Log to stderr in the form: `[CRITICAL] Watchdog detected stalled session: {duration} min`.
-- If `.swarm/evidence/` does not exist, create it recursively with `fs.mkdirSync`.
+- If `.swarm/watchdog/` does not exist, create it recursively with `fs.mkdirSync`.
 
 ### Data Source and Scope
 

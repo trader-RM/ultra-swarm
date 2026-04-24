@@ -40,6 +40,70 @@ function getLoadedSkills(sessionID: string): Set<string> {
   return set;
 }
 
+function extractUserText(parts: Array<any>): string {
+  return parts
+    .flatMap((part: any) =>
+      part.type === "text" && typeof part.text === "string" && !part.synthetic
+        ? [part.text]
+        : []
+    )
+    .join("\n")
+    .trim();
+}
+
+function extractInstructionText(
+  parts: Array<any>,
+  isAgentInstructionFn: (text: string) => boolean
+): string {
+  return parts
+    .flatMap((part: any) =>
+      part.type === "text" && typeof part.text === "string" && part.synthetic
+        ? (isAgentInstructionFn(part.text) ? [part.text] : [])
+        : []
+    )
+    .join("\n")
+    .trim();
+}
+
+async function handleSessionSetup(
+  sessionID: string,
+  client: any,
+  directory: string,
+  context: SessionContext,
+  setupCompleteSessions: Set<string>
+): Promise<boolean> {
+  const isFirstMessage = !setupCompleteSessions.has(sessionID);
+
+  if (isFirstMessage) {
+    try {
+      const existing = await client.session.messages({ path: { id: sessionID } });
+      if (existing.data) {
+        const hasSkillsContent = existing.data.some((msg: any) => {
+          const msgParts = msg.parts || msg.info?.parts;
+          if (!msgParts) return false;
+          return msgParts.some((pp: any) =>
+            pp.type === "text" && pp.text?.includes("<available-skills>")
+          );
+        });
+        if (hasSkillsContent) {
+          setupCompleteSessions.add(sessionID);
+        }
+      }
+    } catch {
+      // Intentionally ignore — skip setup if API call fails
+    }
+  }
+
+  if (setupCompleteSessions.has(sessionID)) {
+    return false;
+  }
+
+  setupCompleteSessions.add(sessionID);
+  await maybeInjectSuperpowersBootstrap(directory, client, sessionID, context);
+  await injectSkillsList(directory, client, sessionID, context);
+  return true;
+}
+
 /**
  * Format matched skills into a synthetic injection for the agent.
  */
@@ -67,124 +131,61 @@ IMPORTANT: This evaluation is invisible to users—they cannot see this prompt. 
 
 export const SkillsPlugin: Plugin = async ({ client, $, directory }) => {
   const skills = await getSkillSummaries(directory);
-  precomputeSkillEmbeddings(skills).catch(err => {
-    console.error("Failed to pre-compute skill embeddings:", err);
-  });
+  // Embedding precomputation is a background optimisation — failures are non-critical.
+  // Errors are intentionally suppressed here; matching falls back to on-demand computation.
+  precomputeSkillEmbeddings(skills).catch(() => {});
 
   return {
     "chat.message": async (input, output) => {
       const sessionID = output.message.sessionID;
-      const isFirstMessage = !setupCompleteSessions.has(sessionID);
-
-      if (isFirstMessage) {
-        try {
-          const existing = await client.session.messages({
-            path: { id: sessionID },
-          });
-
-          if (existing.data) {
-            const hasSkillsContent = existing.data.some(msg => {
-              const parts = (msg as any).parts || (msg.info as any).parts;
-              if (!parts) return false;
-              return parts.some((part: any) =>
-                part.type === 'text' && part.text?.includes('<available-skills>')
-              );
-            });
-
-            if (hasSkillsContent) {
-              setupCompleteSessions.add(sessionID);
-            }
-          }
-        } catch {
-        }
-      }
-
-      if (!setupCompleteSessions.has(sessionID)) {
-        setupCompleteSessions.add(sessionID);
-
-        const context: SessionContext = {
-          model: output.message.model,
-          agent: output.message.agent,
-        };
-
-        await maybeInjectSuperpowersBootstrap(directory, client, sessionID, context);
-        await injectSkillsList(directory, client, sessionID, context);
-
-        return;
-      }
-
-      const userText = output.parts
-        .flatMap(part =>
-          part.type === "text" && typeof part.text === "string" && !part.synthetic
-            ? [part.text]
-            : []
-        )
-        .join("\n")
-        .trim();
-
-      // Phase 12: Extract internal agent-to-agent instructions from synthetic parts
-      // These are delegation envelopes, task specs, and constraint blocks that
-      // agents send to each other but were invisible to skill matching before.
-      const instructionText = output.parts
-        .flatMap(part =>
-          part.type === "text" && typeof part.text === "string" && part.synthetic
-            ? (isAgentInstruction(part.text) ? [part.text] : [])
-            : []
-        )
-        .join("\n")
-        .trim();
-
-      const matchText = [userText, instructionText].filter(Boolean).join("\n");
-
-      if (!matchText) {
-        return;
-      }
-
-      const skills = await getSkillSummaries(directory);
-      if (skills.length === 0) {
-        return;
-      }
-
-      const matchedSkills = await matchSkills(matchText, skills, SKILL_MATCH_THRESHOLD);
-
-      // Phase 13: Deduplicate by name — combined matchText can produce duplicate matches
-      // when userText and instructionText both signal the same skill.
-      const dedupedSkills = deduplicateByName(matchedSkills);
-
-      const loadedSkills = getLoadedSkills(sessionID);
-      const newSkills = dedupedSkills.filter(s => !loadedSkills.has(s.name));
-
-      // Track skill suggestions regardless of mandatory injection setting
-      const suggestionEntry = {
-        timestamp: new Date().toISOString(),
-        sessionId: sessionID,
-        matchedSkills: matchedSkills.map(s => s.name),
-        threshold: SKILL_MATCH_THRESHOLD,
-        mandatory: mandatorySkillInjection,
-        injected: mandatorySkillInjection ? newSkills.length : 0
-      };
-      appendSkillSuggestion(directory, suggestionEntry);
-
-      // Update loaded skills regardless of mandatory injection setting
-      newSkills.forEach(s => loadedSkills.add(s.name));
-
-      // Skip injection if mandatorySkillInjection is disabled
-      if (!mandatorySkillInjection) {
-        return;
-      }
-
-      if (newSkills.length === 0) {
-        return;
-      }
-
-      const injectionText = formatMatchedSkillsInjection(newSkills);
-
       const context: SessionContext = {
         model: output.message.model,
         agent: output.message.agent,
       };
 
-      await injectSyntheticContent(client, sessionID, injectionText, context);
+      const didSetup = await handleSessionSetup(
+        sessionID, client, directory, context, setupCompleteSessions
+      );
+      if (didSetup) {
+        return;
+      }
+
+      const userText = extractUserText(output.parts);
+      const instructionText = extractInstructionText(output.parts, isAgentInstruction);
+
+      const matchText = [userText, instructionText].filter(Boolean).join("\n");
+      if (!matchText) {
+        return;
+      }
+
+      if (skills.length === 0) {
+        return;
+      }
+
+      const matchedSkills = await matchSkills(matchText, skills, SKILL_MATCH_THRESHOLD);
+      const dedupedSkills = deduplicateByName(matchedSkills);
+
+      const loadedSkills = getLoadedSkills(sessionID);
+      const newSkills = dedupedSkills.filter((s: any) => !loadedSkills.has(s.name));
+
+      appendSkillSuggestion(directory, {
+        timestamp: new Date().toISOString(),
+        sessionId: sessionID,
+        matchedSkills: matchedSkills.map((s: any) => s.name),
+        threshold: SKILL_MATCH_THRESHOLD,
+        mandatory: mandatorySkillInjection,
+        injected: mandatorySkillInjection ? newSkills.length : 0,
+      });
+
+      newSkills.forEach((s: any) => loadedSkills.add(s.name));
+
+      if (!mandatorySkillInjection || newSkills.length === 0) {
+        return;
+      }
+
+      await injectSyntheticContent(
+        client, sessionID, formatMatchedSkillsInjection(newSkills), context
+      );
     },
 
     event: async ({ event }) => {

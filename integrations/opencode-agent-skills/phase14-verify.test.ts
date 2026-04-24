@@ -26,7 +26,7 @@ describe("Phase 14 — OpenSkills Integration Smoke Tests", () => {
         continue;
       }
 
-      if (entry.isFile() && entry.name.endsWith(".md")) {
+      if (entry.isFile() && entry.name === "SKILL.md") {
         markdownFiles.push(entryPath);
       }
     }
@@ -43,15 +43,11 @@ describe("Phase 14 — OpenSkills Integration Smoke Tests", () => {
   it("Check 1: Skill files have valid frontmatter with name and description", () => {
     const entries = collectSkillMarkdownFiles(SKILLS_DIR);
     expect(entries.length).toBeGreaterThan(0);
+
     const badSkills: string[] = [];
-    const skillFiles = entries.filter(file => {
-      const content = fs.readFileSync(file, "utf-8");
-      return /(?:^|\n)name:\s*.+/m.test(content) && /(?:^|\n)description:\s*.+/m.test(content);
-    });
 
-    expect(skillFiles.length).toBeGreaterThan(0);
-
-    for (const file of skillFiles.slice(0, 20)) {
+    // Iterate ALL collected files — do not pre-filter
+    for (const file of entries) {
       const content = fs.readFileSync(file, "utf-8");
       const hasFrontmatter = content.startsWith("---");
       const hasName = /(?:^|\n)name:\s*.+/m.test(content);

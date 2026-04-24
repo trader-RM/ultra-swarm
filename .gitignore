@@ -29,6 +29,10 @@ coverage/
 # Temp working files
 tmp/
 
+# Watchdog temp artifacts
+.tmp-watchdog-*.txt
+integrations/ralphy/scripts/tmp-test-evidence/
+
 # Merge workspace
 _merge/
 _v6.68.0_compare/
