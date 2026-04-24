@@ -7,6 +7,7 @@ import {
 } from "./watchdog-launcher";
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 
 describe("watchdog launcher", () => {
   it("starts the watchdog process without throwing", async () => {
@@ -39,18 +40,15 @@ describe("watchdog launcher", () => {
 });
 
 describe("critical handler", () => {
-  const tmpDir = path.join(__dirname, "tmp-test-evidence");
+  let tmpDir: string;
 
   beforeEach(() => {
-    if (fs.existsSync(tmpDir)) {
-      fs.rmSync(tmpDir, { recursive: true });
-    }
-    fs.mkdirSync(tmpDir, { recursive: true });
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "watchdog-test-"));
   });
 
   afterEach(() => {
-    if (fs.existsSync(tmpDir)) {
-      fs.rmSync(tmpDir, { recursive: true });
+    if (tmpDir && fs.existsSync(tmpDir)) {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
 

@@ -134,7 +134,6 @@ export const SkillsPlugin: Plugin = async ({ client, $, directory }) => {
   // Embedding precomputation is a background optimisation — failures are non-critical.
   // Errors are intentionally suppressed here; matching falls back to on-demand computation.
   precomputeSkillEmbeddings(skills).catch(() => {});
-  let skillsCache: { summaries: typeof skills; expiresAt: number } | null = null;
 
   return {
     "chat.message": async (input, output) => {
@@ -159,21 +158,15 @@ export const SkillsPlugin: Plugin = async ({ client, $, directory }) => {
         return;
       }
 
-      if (!skillsCache || Date.now() > skillsCache.expiresAt) {
-        const fresh = await getSkillSummaries(directory);
-        skillsCache = { summaries: fresh, expiresAt: Date.now() + 60_000 };
-      }
-      const currentSkills = skillsCache.summaries;
-
-      if (currentSkills.length === 0) {
+      if (skills.length === 0) {
         return;
       }
 
-      const matchedSkills = await matchSkills(matchText, currentSkills, SKILL_MATCH_THRESHOLD);
+      const matchedSkills = await matchSkills(matchText, skills, SKILL_MATCH_THRESHOLD);
       const dedupedSkills = deduplicateByName(matchedSkills);
 
       const loadedSkills = getLoadedSkills(sessionID);
-      const newSkills = dedupedSkills.filter((s: any) => !loadedSkills.has(s.name));
+      const newSkills = dedupedSkills.filter((s) => !loadedSkills.has(s.name));
 
       appendSkillSuggestion(directory, {
         timestamp: new Date().toISOString(),
@@ -184,7 +177,7 @@ export const SkillsPlugin: Plugin = async ({ client, $, directory }) => {
         injected: mandatorySkillInjection ? newSkills.length : 0,
       });
 
-      newSkills.forEach((s: any) => loadedSkills.add(s.name));
+      newSkills.forEach((s) => loadedSkills.add(s.name));
 
       if (!mandatorySkillInjection || newSkills.length === 0) {
         return;

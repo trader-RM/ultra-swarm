@@ -1,7 +1,7 @@
 # Deploy Phase 12 patch to opencode-agent-skills
 # Copies the patched plugin.ts from staging to the live node_modules location
 $source = Join-Path $PSScriptRoot "plugin.patch.ts"
-$target = "C:\Users\Ryan McNish\.config\opencode\node_modules\opencode-agent-skills\src\plugin.ts"
+$target = "$env:USERPROFILE\.config\opencode\node_modules\opencode-agent-skills\src\plugin.ts"
 $sourceUtils = Join-Path $PSScriptRoot "plugin.patch.utils.ts"
 $targetUtils = Join-Path (Split-Path $target -Parent) "plugin.patch.utils.ts"
 
